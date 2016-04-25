@@ -69,7 +69,7 @@
 #define E2_DIR_PIN         28
 #define E2_ENABLE_PIN      39
 
-#define LED_PIN            13
+#define LED_PIN            6
 
 #define FAN_PIN             7
 #define FAN1_PIN            8
@@ -85,7 +85,7 @@
   #if TEMP_SENSOR_0 == -1
     #define TEMP_0_PIN          6   // ANALOG NUMBERING - connector *K1* on RUMBA thermocouple ADD ON is used
   #else
-    #define TEMP_0_PIN         15   // ANALOG NUMBERING - default connector for thermistor *T0* on rumba board is used
+    #define TEMP_0_PIN         10   // ANALOG NUMBERING - default connector for thermistor *T0* on rumba board is used
   #endif
 #endif
 
@@ -97,7 +97,7 @@
   #if TEMP_SENSOR_1 == -1
     #define TEMP_1_PIN          5   // ANALOG NUMBERING - connector *K2* on RUMBA thermocouple ADD ON is used
   #else
-    #define TEMP_1_PIN         14   // ANALOG NUMBERING - default connector for thermistor *T1* on rumba board is used
+    #define TEMP_1_PIN          9   // ANALOG NUMBERING - default connector for thermistor *T1* on rumba board is used
   #endif
 #endif
 
@@ -138,8 +138,8 @@
 #define LCD_PINS_D5        38
 #define LCD_PINS_D6        41
 #define LCD_PINS_D7        40
-#define BTN_EN1            11
-#define BTN_EN2            12
+#define BTN_EN1            12
+#define BTN_EN2            11
 #define BTN_ENC            43
 
 #define SERVO0_PIN         5
