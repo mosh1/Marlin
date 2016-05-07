@@ -1,3 +1,11 @@
+# Marlin 3D Printer Firmware for the E3D BigBox
+
+__For the original Marlin README see below!__
+
+This is the Marlin firmware configured for the E3D BigBox Dual Hybrid Titan Mirrored aka V1.1 with Titan extruders and mesh bed leveling (MBL) in a mirrored setup compared to how E3D builds the box.
+
+That means in this setup the direct Titan on the head is extruder/tool 0 and the bowden Titan is extruder/tool 1.
+
 # Marlin 3D Printer Firmware
 <img align="top" width=175 src="Documentation/Logo/Marlin%20Logo%20GitHub.png" />
  Additional documentation can be found in [The Marlin Wiki](https://github.com/MarlinFirmware/Marlin/wiki).
