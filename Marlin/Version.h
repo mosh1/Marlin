@@ -60,7 +60,7 @@
  * has a distinct Github fork— the Source Code URL should just be the main
  * Marlin repository.
  */
-#define SOURCE_CODE_URL "https://github.com/Alex9779/Marlin_BigBox_Dual"
+#define SOURCE_CODE_URL "https://github.com/Alex9779/Marlin"
 
 /**
  * Default generic printer UUID.
