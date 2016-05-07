@@ -1,3 +1,9 @@
+# Marlin 3D Printer Firmware for the E3D BigBox
+
+__For the original Marlin README see below!__
+
+This is the Marlin firmware configured for the E3D BigBox Dual Hybrid aka V1.1 with direct drive extruders and auto bed leveling (ABL).
+
 # Marlin 3D Printer Firmware
 <img align="top" width=175 src="Documentation/Logo/Marlin%20Logo%20GitHub.png" />
  Additional documentation can be found in [The Marlin Wiki](https://github.com/MarlinFirmware/Marlin/wiki).
