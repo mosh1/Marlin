@@ -46,6 +46,8 @@
 
   #define CONFIGURATION_LCD
 
+  #define LCD_HAS_DIRECTIONAL_BUTTONS (BUTTON_EXISTS(UP) || BUTTON_EXISTS(DWN) || BUTTON_EXISTS(LFT) || BUTTON_EXISTS(RT))
+
   #if ENABLED(MAKRPANEL)
     #define DOGLCD
     #define DEFAULT_LCD_CONTRAST 17
@@ -673,6 +675,8 @@
 
   #define HAS_TEMP_HOTEND (HAS_TEMP_0 || ENABLED(HEATER_0_USES_MAX6675))
 
+  #define HAS_THERMALLY_PROTECTED_BED (HAS_TEMP_BED && HAS_HEATER_BED && ENABLED(THERMAL_PROTECTION_BED))
+
   /**
    * Helper Macros for heaters and extruder fan
    */
@@ -747,6 +751,30 @@
       || ENABLED(Z_PROBE_SLED) \
     )
     #define HAS_Z_MIN_PROBE
+  #endif
+
+  /**
+   * Delta radius/rod trimmers
+   */
+  #if ENABLED(DELTA)
+    #ifndef DELTA_RADIUS_TRIM_TOWER_1
+      #define DELTA_RADIUS_TRIM_TOWER_1 0.0
+    #endif
+    #ifndef DELTA_RADIUS_TRIM_TOWER_2
+      #define DELTA_RADIUS_TRIM_TOWER_2 0.0
+    #endif
+    #ifndef DELTA_RADIUS_TRIM_TOWER_3
+      #define DELTA_RADIUS_TRIM_TOWER_3 0.0
+    #endif
+    #ifndef DELTA_DIAGONAL_ROD_TRIM_TOWER_1
+      #define DELTA_DIAGONAL_ROD_TRIM_TOWER_1 0.0
+    #endif
+    #ifndef DELTA_DIAGONAL_ROD_TRIM_TOWER_2
+      #define DELTA_DIAGONAL_ROD_TRIM_TOWER_2 0.0
+    #endif
+    #ifndef DELTA_DIAGONAL_ROD_TRIM_TOWER_3
+      #define DELTA_DIAGONAL_ROD_TRIM_TOWER_3 0.0
+    #endif
   #endif
 
 #endif //CONFIGURATION_LCD

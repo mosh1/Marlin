@@ -29,20 +29,20 @@
 /**
  * Marlin release version identifier
  */
-#define SHORT_BUILD_VERSION "1.1.0-RC6 BBDual"
+#define SHORT_BUILD_VERSION "1.1.0-RCBugFix BBDual"
 
 /**
  * Verbose version identifier which should contain a reference to the location
  * from where the binary was downloaded or the source code was compiled.
  */
-#define DETAILED_BUILD_VERSION SHORT_BUILD_VERSION "1.1.0-RC6 BigBox Dual"
+#define DETAILED_BUILD_VERSION SHORT_BUILD_VERSION "1.1.0-RCBugFix BigBox Dual"
 
 /**
  * The STRING_DISTRIBUTION_DATE represents when the binary file was built,
  * here we define this default string as the date where the latest release
  * version was tagged.
  */
-#define STRING_DISTRIBUTION_DATE "2016-04-24 12:00"
+#define STRING_DISTRIBUTION_DATE "2016-04-27 12:00"
 
 /**
  * @todo: Missing documentation block
