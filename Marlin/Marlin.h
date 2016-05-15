@@ -45,17 +45,12 @@
 #include "pins.h"
 
 #ifndef SANITYCHECK_H
-  #error Your Configuration.h and Configuration_adv.h files are outdated!
+  #error "Your Configuration.h and Configuration_adv.h files are outdated!"
 #endif
 
 #include "Arduino.h"
 
 typedef unsigned long millis_t;
-
-// Arduino < 1.0.0 does not define this, so we need to do it ourselves
-#ifndef analogInputToDigitalPin
-  #define analogInputToDigitalPin(p) ((p) + 0xA0)
-#endif
 
 #ifdef USBCON
   #include "HardwareSerial.h"
