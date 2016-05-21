@@ -106,7 +106,7 @@
  * G2  - CW ARC
  * G3  - CCW ARC
  * G4  - Dwell S<seconds> or P<milliseconds>
- * G5  - Cubic B-spline with
+ * G5  - Cubic B-spline with XYZE destination and IJPQ offsets
  * G10 - retract filament according to settings of M207
  * G11 - retract recover filament according to settings of M208
  * G28 - Home one or more axes
@@ -2546,14 +2546,7 @@ inline void gcode_G4() {
   inline void gcode_G5() {
     if (IsRunning()) {
 
-      #ifdef SF_ARC_FIX
-        bool relative_mode_backup = relative_mode;
-        relative_mode = true;
-      #endif
       gcode_get_destination();
-      #ifdef SF_ARC_FIX
-        relative_mode = relative_mode_backup;
-      #endif
 
       float offset[] = {
         code_seen('I') ? code_value() : 0.0,
@@ -2925,17 +2918,19 @@ inline void gcode_G28() {
     #endif
   #endif
 
-  // For mesh leveling move back to Z=0
+  // Enable mesh leveling again
   #if ENABLED(MESH_BED_LEVELING)
     if (mbl_was_active && home_all_axis) {
       current_position[Z_AXIS] = MESH_HOME_SEARCH_Z;
       sync_plan_position();
       mbl.active = 1;
-      current_position[Z_AXIS] = 0.0;
-      set_destination_to_current();
-      feedrate = homing_feedrate[Z_AXIS];
-      line_to_destination();
-      stepper.synchronize();
+      #if ENABLED(MESH_G28_REST_ORIGIN)
+        current_position[Z_AXIS] = 0.0;
+        set_destination_to_current();
+        feedrate = homing_feedrate[Z_AXIS];
+        line_to_destination();
+        stepper.synchronize();
+      #endif
       #if ENABLED(DEBUG_LEVELING_FEATURE)
         if (DEBUGGING(LEVELING)) DEBUG_POS("mbl_was_active", current_position);
       #endif
@@ -3645,7 +3640,7 @@ inline void gcode_G28() {
     #if ENABLED(MECHANICAL_PROBE)
       stow_z_probe();
     #endif
-    
+
     #ifdef Z_PROBE_END_SCRIPT
       #if ENABLED(DEBUG_LEVELING_FEATURE)
         if (DEBUGGING(LEVELING)) {
@@ -5906,12 +5901,16 @@ inline void gcode_M410() { stepper.quick_stop(); }
 
   /**
    * M421: Set a single Mesh Bed Leveling Z coordinate
+   * Use either 'M421 X<mm> Y<mm> Z<mm>' or 'M421 I<xindex> J<yindex> Z<mm>'
    */
   inline void gcode_M421() {
     float x = 0, y = 0, z = 0;
-    bool err = false, hasX, hasY, hasZ;
+    int8_t i = 0, j = 0;
+    bool err = false, hasX, hasY, hasZ, hasI, hasJ;
     if ((hasX = code_seen('X'))) x = code_value();
     if ((hasY = code_seen('Y'))) y = code_value();
+    if ((hasI = code_seen('I'))) i = code_value();
+    if ((hasJ = code_seen('J'))) j = code_value();
     if ((hasZ = code_seen('Z'))) z = code_value();
 
     if (hasX && hasY && hasZ) {
@@ -5926,7 +5925,16 @@ inline void gcode_M410() { stepper.quick_stop(); }
         SERIAL_ERRORLNPGM(MSG_ERR_MESH_XY);
       }
     }
-    else {
+    else if (hasI && hasJ && hasZ) {
+      if (i >= 0 && i < MESH_NUM_X_POINTS && j >= 0 && j < MESH_NUM_Y_POINTS)
+        mbl.set_z(i, j, z);
+      else {
+        SERIAL_ERROR_START;
+        SERIAL_ERRORLNPGM(MSG_ERR_MESH_XY);
+      }
+    }
+    else 
+    {
       SERIAL_ERROR_START;
       SERIAL_ERRORLNPGM(MSG_ERR_M421_REQUIRES_XYZ);
     }
@@ -6335,10 +6343,20 @@ inline void gcode_M907() {
 
 /**
  * M999: Restart after being stopped
+ *
+ * Default behaviour is to flush the serial buffer and request
+ * a resend to the host starting on the last N line received.
+ *
+ * Sending "M999 S1" will resume printing without flushing the
+ * existing command buffer.
+ *
  */
 inline void gcode_M999() {
   Running = true;
   lcd_reset_alert_level();
+
+  if (code_seen('S') && code_value_short() == 1) return;
+
   // gcode_LastN = Stopped_gcode_LastN;
   FlushSerialRequestResend();
 }
@@ -7594,13 +7612,14 @@ void prepare_move() {
 
     float feed_rate = feedrate * feedrate_multiplier / 60 / 100.0;
 
-    millis_t previous_ms = millis();
+    millis_t next_idle_ms = millis() + 200UL;
 
     for (i = 1; i < segments; i++) { // Iterate (segments-1) times
 
+      thermalManager.manage_heater();
       millis_t now = millis();
-      if (now - previous_ms > 200UL) {
-        previous_ms = now;
+      if (ELAPSED(now, next_idle_ms)) {
+        next_idle_ms = now + 200UL;
         idle();
       }
 
@@ -7850,7 +7869,7 @@ void idle(
   host_keepalive();
   lcd_update();
   #if ENABLED(PRINTCOUNTER)
-      print_job_timer.tick();
+    print_job_timer.tick();
   #endif
 }
 
