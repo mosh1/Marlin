@@ -315,11 +315,17 @@
    * CoreXY and CoreXZ
    */
   #if ENABLED(COREXY)
+    #define CORE_AXIS_1 A_AXIS // XY from A + B
     #define CORE_AXIS_2 B_AXIS
-    #define CORE_AXIS_3 Z_AXIS
+    #define NORMAL_AXIS Z_AXIS
   #elif ENABLED(COREXZ)
+    #define CORE_AXIS_1 A_AXIS // XZ from A + C
     #define CORE_AXIS_2 C_AXIS
-    #define CORE_AXIS_3 Y_AXIS
+    #define NORMAL_AXIS Y_AXIS
+  #elif ENABLED(COREYZ)
+    #define CORE_AXIS_1 B_AXIS // YZ from B + C
+    #define CORE_AXIS_2 C_AXIS
+    #define NORMAL_AXIS X_AXIS
   #endif
 
   /**
@@ -538,6 +544,16 @@
   #endif
 
   #define ARRAY_BY_EXTRUDERS1(v1) ARRAY_BY_EXTRUDERS(v1, v1, v1, v1)
+
+  /**
+   * With SINGLENOZZLE all "extruders" are in the same place
+   */
+  #if ENABLED(SINGLENOZZLE)
+    #undef EXTRUDER_OFFSET_X
+    #undef EXTRUDER_OFFSET_Y
+    #define EXTRUDER_OFFSET_X { 0 }
+    #define EXTRUDER_OFFSET_Y { 0 }
+  #endif
 
   /**
    * Z_DUAL_ENDSTOPS endstop reassignment

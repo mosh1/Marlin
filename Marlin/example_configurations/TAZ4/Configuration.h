@@ -120,6 +120,9 @@
 // :[1,2,3,4]
 #define EXTRUDERS 1
 
+// For Cyclops or any "multi-extruder" that shares a single nozzle.
+//#define SINGLENOZZLE
+
 // Offset of the extruders (uncomment if using more than one and relying on firmware to position when changing).
 // The offset has to be X=0, Y=0 for the extruder 0 hotend (default extruder).
 // For the other hotends it is their distance from the extruder 0 hotend.
@@ -363,11 +366,10 @@
 
 // @section machine
 
-// Uncomment this option to enable CoreXY kinematics
+// Uncomment one of these options to enable CoreXY, CoreXZ, or CoreYZ kinematics
 //#define COREXY
-
-// Uncomment this option to enable CoreXZ kinematics
 //#define COREXZ
+//#define COREYZ
 
 // Enable this option for Toshiba steppers
 //#define CONFIG_STEPPERS_TOSHIBA

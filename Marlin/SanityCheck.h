@@ -149,7 +149,9 @@
     #error "EXTRUDERS must be 1 with Z_DUAL_STEPPER_DRIVERS."
   #endif
 
-#endif // EXTRUDERS > 1
+#elif ENABLED(SINGLENOZZLE)
+  #error "SINGLENOZZLE requires 2 or more EXTRUDERS."
+#endif
 
 /**
  * Limited number of servos
@@ -385,6 +387,16 @@
 
   #endif
 
+#endif
+
+/**
+ * Don't set more than one kinematic type
+ */
+#if (ENABLED(DELTA) && (ENABLED(SCARA) || ENABLED(COREXY) || ENABLED(COREXZ) || ENABLED(COREYZ))) \
+ || (ENABLED(SCARA) && (ENABLED(COREXY) || ENABLED(COREXZ) || ENABLED(COREYZ))) \
+ || (ENABLED(COREXY) && (ENABLED(COREXZ) || ENABLED(COREYZ))) \
+ || (ENABLED(COREXZ) && ENABLED(COREYZ))
+  #error "Please enable only one of DELTA, SCARA, COREXY, COREXZ, or COREYZ."
 #endif
 
 /**
