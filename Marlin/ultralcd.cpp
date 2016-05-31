@@ -490,10 +490,12 @@ inline void line_to_current(AxisEnum axis) {
 
 static void lcd_led_toggle() {
   if (led_on) {
-    enqueue_and_echo_commands_P(PSTR("M42 S0"));
+    analogWrite(LED_PIN, 0);
+    led_on = false;
   }
   else {
-    enqueue_and_echo_commands_P(PSTR("M42 S255"));
+    analogWrite(LED_PIN, 255);
+    led_on = true;
   }
 }
 
@@ -1301,7 +1303,7 @@ static void _lcd_move_menu_axis() {
   if (_MOVE_XYZ_ALLOWED) {
     MENU_ITEM(submenu, MSG_MOVE_X, lcd_move_x);
     MENU_ITEM(submenu, MSG_MOVE_Y, lcd_move_y);
-	MENU_ITEM(submenu, MSG_MOVE_Z, lcd_move_z);  // moved menu item of Z to 10 mm menu 
+	MENU_ITEM(submenu, MSG_MOVE_Z, lcd_move_z);  // moved menu item of Z to 10 mm menu
   }
   if (move_menu_scale < 10.0) {
     #if EXTRUDERS == 1
