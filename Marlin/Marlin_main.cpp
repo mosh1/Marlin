@@ -857,6 +857,9 @@ void setup() {
     pinMode(STAT_LED_BLUE, OUTPUT);
     digitalWrite(STAT_LED_BLUE, LOW); // turn it off
   #endif
+
+  analogWrite(LED_PIN, 255);
+  led_on = true;
 }
 
 /**
