@@ -305,6 +305,8 @@ menuFunc_t callbackFunc;              // call this after editing
 // place-holders for Ki and Kd edits
 float raw_Ki, raw_Kd;
 
+extern bool led_on;
+
 /**
  * General function to go directly to a menu
  * Remembers the previous position
@@ -492,6 +494,17 @@ inline void line_to_current(AxisEnum axis) {
 
 #endif //SDSUPPORT
 
+static void lcd_led_toggle() {
+  if (led_on) {
+    analogWrite(LED_PIN, 0);
+    led_on = false;
+  }
+  else {
+    analogWrite(LED_PIN, 255);
+    led_on = true;
+  }
+}
+
 /**
  *
  * "Main" menu
@@ -511,6 +524,13 @@ static void lcd_main_menu() {
     #endif
   }
   MENU_ITEM(submenu, MSG_CONTROL, lcd_control_menu);
+
+  if (led_on) {
+    MENU_ITEM(function, "LEDs off", lcd_led_toggle);
+  }
+  else {
+    MENU_ITEM(function, "LEDs on", lcd_led_toggle);
+  }
 
   #if ENABLED(SDSUPPORT)
     if (card.cardOK) {
