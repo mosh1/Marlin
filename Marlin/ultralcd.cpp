@@ -50,6 +50,9 @@
 
 int8_t encoderDiff; // updated from interrupt context and added to encoderPosition every LCD update
 
+int8_t manual_move_axis = (int8_t)NO_AXIS;
+millis_t manual_move_start_time = 0;
+
 bool encoderRateMultiplierEnabled;
 int32_t lastEncoderMovementMillis;
 
@@ -484,6 +487,10 @@ inline void line_to_current(AxisEnum axis) {
 
   static void lcd_sdcard_stop() {
     stepper.quick_stop();
+    #if DISABLED(DELTA) && DISABLED(SCARA)
+      set_current_position_from_planner();
+    #endif
+    clear_command_queue();
     card.sdprinting = false;
     card.closefile();
     print_job_timer.stop();
@@ -609,28 +616,28 @@ void lcd_set_home_offsets() {
   #if TEMP_SENSOR_0 != 0
     void watch_temp_callback_E0() { thermalManager.start_watching_heater(0); }
   #endif
-  #if EXTRUDERS > 1 && TEMP_SENSOR_1 != 0
+  #if HOTENDS > 1 && TEMP_SENSOR_1 != 0
     void watch_temp_callback_E1() { thermalManager.start_watching_heater(1); }
-  #endif // EXTRUDERS > 1
-  #if EXTRUDERS > 2 && TEMP_SENSOR_2 != 0
+  #endif // HOTENDS > 1
+  #if HOTENDS > 2 && TEMP_SENSOR_2 != 0
     void watch_temp_callback_E2() { thermalManager.start_watching_heater(2); }
-  #endif // EXTRUDERS > 2
-  #if EXTRUDERS > 3 && TEMP_SENSOR_3 != 0
+  #endif // HOTENDS > 2
+  #if HOTENDS > 3 && TEMP_SENSOR_3 != 0
     void watch_temp_callback_E3() { thermalManager.start_watching_heater(3); }
-  #endif // EXTRUDERS > 3
+  #endif // HOTENDS > 3
 #else
   #if TEMP_SENSOR_0 != 0
     void watch_temp_callback_E0() {}
   #endif
-  #if EXTRUDERS > 1 && TEMP_SENSOR_1 != 0
+  #if HOTENDS > 1 && TEMP_SENSOR_1 != 0
     void watch_temp_callback_E1() {}
-  #endif // EXTRUDERS > 1
-  #if EXTRUDERS > 2 && TEMP_SENSOR_2 != 0
+  #endif // HOTENDS > 1
+  #if HOTENDS > 2 && TEMP_SENSOR_2 != 0
     void watch_temp_callback_E2() {}
-  #endif // EXTRUDERS > 2
-  #if EXTRUDERS > 3 && TEMP_SENSOR_3 != 0
+  #endif // HOTENDS > 2
+  #if HOTENDS > 3 && TEMP_SENSOR_3 != 0
     void watch_temp_callback_E3() {}
-  #endif // EXTRUDERS > 3
+  #endif // HOTENDS > 3
 #endif
 
 #if ENABLED(THERMAL_PROTECTION_BED) && WATCH_BED_TEMP_PERIOD > 0
@@ -670,28 +677,28 @@ static void lcd_tune_menu() {
   // Nozzle:
   // Nozzle [1-4]:
   //
-  #if EXTRUDERS == 1
+  #if HOTENDS == 1
     #if TEMP_SENSOR_0 != 0
       MENU_MULTIPLIER_ITEM_EDIT_CALLBACK(int3, MSG_NOZZLE, &thermalManager.target_temperature[0], 0, HEATER_0_MAXTEMP - 15, watch_temp_callback_E0);
     #endif
-  #else //EXTRUDERS > 1
+  #else //HOTENDS > 1
     #if TEMP_SENSOR_0 != 0
       MENU_MULTIPLIER_ITEM_EDIT_CALLBACK(int3, MSG_NOZZLE MSG_N1, &thermalManager.target_temperature[0], 0, HEATER_0_MAXTEMP - 15, watch_temp_callback_E0);
     #endif
     #if TEMP_SENSOR_1 != 0
       MENU_MULTIPLIER_ITEM_EDIT_CALLBACK(int3, MSG_NOZZLE MSG_N2, &thermalManager.target_temperature[1], 0, HEATER_1_MAXTEMP - 15, watch_temp_callback_E1);
     #endif
-    #if EXTRUDERS > 2
+    #if HOTENDS > 2
       #if TEMP_SENSOR_2 != 0
         MENU_MULTIPLIER_ITEM_EDIT_CALLBACK(int3, MSG_NOZZLE MSG_N3, &thermalManager.target_temperature[2], 0, HEATER_2_MAXTEMP - 15, watch_temp_callback_E2);
       #endif
-      #if EXTRUDERS > 3
+      #if HOTENDS > 3
         #if TEMP_SENSOR_3 != 0
           MENU_MULTIPLIER_ITEM_EDIT_CALLBACK(int3, MSG_NOZZLE MSG_N4, &thermalManager.target_temperature[3], 0, HEATER_3_MAXTEMP - 15, watch_temp_callback_E3);
         #endif
-      #endif // EXTRUDERS > 3
-    #endif // EXTRUDERS > 2
-  #endif // EXTRUDERS > 1
+      #endif // HOTENDS > 3
+    #endif // HOTENDS > 2
+  #endif // HOTENDS > 1
 
   //
   // Bed:
@@ -793,24 +800,24 @@ void _lcd_preheat(int endnum, const float temph, const float tempb, const int fa
   void lcd_preheat_abs0() { _lcd_preheat(0, absPreheatHotendTemp, absPreheatHPBTemp, absPreheatFanSpeed); }
 #endif
 
-#if EXTRUDERS > 1
+#if HOTENDS > 1
   void lcd_preheat_pla1() { _lcd_preheat(1, plaPreheatHotendTemp, plaPreheatHPBTemp, plaPreheatFanSpeed); }
   void lcd_preheat_abs1() { _lcd_preheat(1, absPreheatHotendTemp, absPreheatHPBTemp, absPreheatFanSpeed); }
-  #if EXTRUDERS > 2
+  #if HOTENDS > 2
     void lcd_preheat_pla2() { _lcd_preheat(2, plaPreheatHotendTemp, plaPreheatHPBTemp, plaPreheatFanSpeed); }
     void lcd_preheat_abs2() { _lcd_preheat(2, absPreheatHotendTemp, absPreheatHPBTemp, absPreheatFanSpeed); }
-    #if EXTRUDERS > 3
+    #if HOTENDS > 3
       void lcd_preheat_pla3() { _lcd_preheat(3, plaPreheatHotendTemp, plaPreheatHPBTemp, plaPreheatFanSpeed); }
       void lcd_preheat_abs3() { _lcd_preheat(3, absPreheatHotendTemp, absPreheatHPBTemp, absPreheatFanSpeed); }
     #endif
   #endif
 
   void lcd_preheat_pla0123() {
-    #if EXTRUDERS > 1
+    #if HOTENDS > 1
       thermalManager.setTargetHotend(plaPreheatHotendTemp, 1);
-      #if EXTRUDERS > 2
+      #if HOTENDS > 2
         thermalManager.setTargetHotend(plaPreheatHotendTemp, 2);
-        #if EXTRUDERS > 3
+        #if HOTENDS > 3
           thermalManager.setTargetHotend(plaPreheatHotendTemp, 3);
         #endif
       #endif
@@ -818,11 +825,11 @@ void _lcd_preheat(int endnum, const float temph, const float tempb, const int fa
     lcd_preheat_pla0();
   }
   void lcd_preheat_abs0123() {
-    #if EXTRUDERS > 1
+    #if HOTENDS > 1
       thermalManager.setTargetHotend(absPreheatHotendTemp, 1);
-      #if EXTRUDERS > 2
+      #if HOTENDS > 2
         thermalManager.setTargetHotend(absPreheatHotendTemp, 2);
-        #if EXTRUDERS > 3
+        #if HOTENDS > 3
           thermalManager.setTargetHotend(absPreheatHotendTemp, 3);
         #endif
       #endif
@@ -830,7 +837,7 @@ void _lcd_preheat(int endnum, const float temph, const float tempb, const int fa
     lcd_preheat_abs0();
   }
 
-#endif // EXTRUDERS > 1
+#endif // HOTENDS > 1
 
 #if TEMP_SENSOR_BED != 0
   void lcd_preheat_pla_bedonly() { _lcd_preheat(0, 0, plaPreheatHPBTemp, plaPreheatFanSpeed); }
@@ -842,14 +849,14 @@ void _lcd_preheat(int endnum, const float temph, const float tempb, const int fa
   static void lcd_preheat_pla_menu() {
     START_MENU();
     MENU_ITEM(back, MSG_PREPARE);
-    #if EXTRUDERS == 1
+    #if HOTENDS == 1
       MENU_ITEM(function, MSG_PREHEAT_PLA, lcd_preheat_pla0);
     #else
       MENU_ITEM(function, MSG_PREHEAT_PLA_N MSG_H1, lcd_preheat_pla0);
       MENU_ITEM(function, MSG_PREHEAT_PLA_N MSG_H2, lcd_preheat_pla1);
-      #if EXTRUDERS > 2
+      #if HOTENDS > 2
         MENU_ITEM(function, MSG_PREHEAT_PLA_N MSG_H3, lcd_preheat_pla2);
-        #if EXTRUDERS > 3
+        #if HOTENDS > 3
           MENU_ITEM(function, MSG_PREHEAT_PLA_N MSG_H4, lcd_preheat_pla3);
         #endif
       #endif
@@ -864,14 +871,14 @@ void _lcd_preheat(int endnum, const float temph, const float tempb, const int fa
   static void lcd_preheat_abs_menu() {
     START_MENU();
     MENU_ITEM(back, MSG_PREPARE);
-    #if EXTRUDERS == 1
+    #if HOTENDS == 1
       MENU_ITEM(function, MSG_PREHEAT_ABS, lcd_preheat_abs0);
     #else
       MENU_ITEM(function, MSG_PREHEAT_ABS_N MSG_H1, lcd_preheat_abs0);
       MENU_ITEM(function, MSG_PREHEAT_ABS_N MSG_H2, lcd_preheat_abs1);
-      #if EXTRUDERS > 2
+      #if HOTENDS > 2
         MENU_ITEM(function, MSG_PREHEAT_ABS_N MSG_H3, lcd_preheat_abs2);
-        #if EXTRUDERS > 3
+        #if HOTENDS > 3
           MENU_ITEM(function, MSG_PREHEAT_ABS_N MSG_H4, lcd_preheat_abs3);
         #endif
       #endif
@@ -954,7 +961,7 @@ void lcd_cooldown() {
     ENCODER_DIRECTION_NORMAL();
 
     // Encoder wheel adjusts the Z position
-    if (encoderPosition && planner.movesplanned() <= 3) {
+    if (encoderPosition) {
       refresh_cmd_timeout();
       current_position[Z_AXIS] += float((int32_t)encoderPosition) * (MBL_Z_STEP);
       NOLESS(current_position[Z_AXIS], 0);
@@ -967,8 +974,8 @@ void lcd_cooldown() {
           LCDVIEW_REDRAW_NOW
         #endif
       ;
+      encoderPosition = 0;
     }
-    encoderPosition = 0;
 
     static bool debounce_click = false;
     if (LCD_CLICKED) {
@@ -986,7 +993,7 @@ void lcd_cooldown() {
           line_to_current(Z_AXIS);
           stepper.synchronize();
 
-          mbl.active = true;
+          mbl.set_has_mesh(true);
           enqueue_and_echo_commands_P(PSTR("G28"));
           lcd_return_to_status();
           //LCD_MESSAGEPGM(MSG_LEVEL_BED_DONE);
@@ -1008,7 +1015,7 @@ void lcd_cooldown() {
     // Show message above on clicks instead
     if (lcdDrawUpdate) {
       float v = current_position[Z_AXIS] - MESH_HOME_SEARCH_Z;
-      lcd_implementation_drawedit(PSTR(MSG_MOVE_Z), ftostr43(v + (v < 0 ? -0.0001 : 0.0001), '+'));
+      lcd_implementation_drawedit(PSTR(MSG_MOVE_Z), ftostr43sign(v + (v < 0 ? -0.0001 : 0.0001), '+'));
     }
 
   }
@@ -1057,7 +1064,7 @@ void lcd_cooldown() {
     if (LCD_CLICKED) {
       _lcd_level_bed_position = 0;
       current_position[Z_AXIS] = MESH_HOME_SEARCH_Z;
-      planner.set_position(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);
+      planner.set_position_mm(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);
       lcd_goto_menu(_lcd_level_goto_next_point, true);
     }
   }
@@ -1207,6 +1214,31 @@ static void lcd_prepare_menu() {
 #endif // DELTA_CALIBRATION_MENU
 
 /**
+ * If the most recent manual move hasn't been fed to the planner yet,
+ * and the planner can accept one, send immediately
+ */
+inline void manage_manual_move() {
+  if (manual_move_axis != (int8_t)NO_AXIS && millis() >= manual_move_start_time && !planner.is_full()) {
+    #if ENABLED(DELTA)
+      calculate_delta(current_position);
+      planner.buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], current_position[E_AXIS], manual_feedrate[manual_move_axis]/60, active_extruder);
+    #else
+      planner.buffer_line(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS], manual_feedrate[manual_move_axis]/60, active_extruder);
+    #endif
+    manual_move_axis = (int8_t)NO_AXIS;
+  }
+}
+
+/**
+ * Set a flag that lcd_update() should start a move
+ * to "current_position" after a short delay.
+ */
+inline void manual_move_to_current(AxisEnum axis) {
+  manual_move_start_time = millis() + 500UL; // 1/2 second delay
+  manual_move_axis = (int8_t)axis;
+}
+
+/**
  *
  * "Prepare" > "Move Axis" submenu
  *
@@ -1216,16 +1248,16 @@ float move_menu_scale;
 
 static void _lcd_move(const char* name, AxisEnum axis, float min, float max) {
   ENCODER_DIRECTION_NORMAL();
-  if (encoderPosition && planner.movesplanned() <= 3) {
+  if (encoderPosition) {
     refresh_cmd_timeout();
     current_position[axis] += float((int32_t)encoderPosition) * move_menu_scale;
     if (min_software_endstops) NOLESS(current_position[axis], min);
     if (max_software_endstops) NOMORE(current_position[axis], max);
-    line_to_current(axis);
+    encoderPosition = 0;
+    manual_move_to_current(axis);
     lcdDrawUpdate = LCDVIEW_REDRAW_NOW;
   }
-  encoderPosition = 0;
-  if (lcdDrawUpdate) lcd_implementation_drawedit(name, ftostr31(current_position[axis]));
+  if (lcdDrawUpdate) lcd_implementation_drawedit(name, ftostr41sign(current_position[axis]));
   if (LCD_CLICKED) lcd_goto_previous_menu(true);
 }
 #if ENABLED(DELTA)
@@ -1248,12 +1280,12 @@ static void lcd_move_e(
     unsigned short original_active_extruder = active_extruder;
     active_extruder = e;
   #endif
-  if (encoderPosition && planner.movesplanned() <= 3) {
+  if (encoderPosition) {
     current_position[E_AXIS] += float((int32_t)encoderPosition) * move_menu_scale;
-    line_to_current(E_AXIS);
+    encoderPosition = 0;
+    manual_move_to_current(E_AXIS);
     lcdDrawUpdate = LCDVIEW_REDRAW_NOW;
   }
-  encoderPosition = 0;
   if (lcdDrawUpdate) {
     PGM_P pos_label;
     #if EXTRUDERS == 1
@@ -1270,7 +1302,7 @@ static void lcd_move_e(
         #endif //EXTRUDERS > 2
       }
     #endif //EXTRUDERS > 1
-    lcd_implementation_drawedit(pos_label, ftostr31(current_position[E_AXIS]));
+    lcd_implementation_drawedit(pos_label, ftostr41sign(current_position[E_AXIS]));
   }
   if (LCD_CLICKED) lcd_goto_previous_menu(true);
   #if EXTRUDERS > 1
@@ -1396,8 +1428,8 @@ static void lcd_control_menu() {
 #if ENABLED(PID_AUTOTUNE_MENU)
 
   #if ENABLED(PIDTEMP)
-    int autotune_temp[EXTRUDERS] = ARRAY_BY_EXTRUDERS1(150);
-    const int heater_maxtemp[EXTRUDERS] = ARRAY_BY_EXTRUDERS(HEATER_0_MAXTEMP, HEATER_1_MAXTEMP, HEATER_2_MAXTEMP, HEATER_3_MAXTEMP);
+    int autotune_temp[HOTENDS] = ARRAY_BY_HOTENDS1(150);
+    const int heater_maxtemp[HOTENDS] = ARRAY_BY_HOTENDS(HEATER_0_MAXTEMP, HEATER_1_MAXTEMP, HEATER_2_MAXTEMP, HEATER_3_MAXTEMP);
   #endif
 
   #if ENABLED(PIDTEMPBED)
@@ -1425,14 +1457,14 @@ static void lcd_control_menu() {
   // Helpers for editing PID Ki & Kd values
   // grab the PID value out of the temp variable; scale it; then update the PID driver
   void copy_and_scalePID_i(int e) {
-    #if DISABLED(PID_PARAMS_PER_EXTRUDER)
+    #if DISABLED(PID_PARAMS_PER_HOTEND)
       UNUSED(e);
     #endif
     PID_PARAM(Ki, e) = scalePID_i(raw_Ki);
     thermalManager.updatePID();
   }
   void copy_and_scalePID_d(int e) {
-    #if DISABLED(PID_PARAMS_PER_EXTRUDER)
+    #if DISABLED(PID_PARAMS_PER_HOTEND)
       UNUSED(e);
     #endif
     PID_PARAM(Kd, e) = scalePID_d(raw_Kd);
@@ -1451,17 +1483,17 @@ static void lcd_control_menu() {
   #endif
 
   _PIDTEMP_FUNCTIONS(0);
-  #if ENABLED(PID_PARAMS_PER_EXTRUDER)
-    #if EXTRUDERS > 1
+  #if ENABLED(PID_PARAMS_PER_HOTEND)
+    #if HOTENDS > 1
       _PIDTEMP_FUNCTIONS(1);
-      #if EXTRUDERS > 2
+      #if HOTENDS > 2
         _PIDTEMP_FUNCTIONS(2);
-        #if EXTRUDERS > 3
+        #if HOTENDS > 3
           _PIDTEMP_FUNCTIONS(3);
-        #endif //EXTRUDERS > 3
-      #endif //EXTRUDERS > 2
-    #endif //EXTRUDERS > 1
-  #endif //PID_PARAMS_PER_EXTRUDER
+        #endif //HOTENDS > 3
+      #endif //HOTENDS > 2
+    #endif //HOTENDS > 1
+  #endif //PID_PARAMS_PER_HOTEND
 
 #endif //PIDTEMP
 
@@ -1482,28 +1514,28 @@ static void lcd_control_temperature_menu() {
   // Nozzle:
   // Nozzle [1-4]:
   //
-  #if EXTRUDERS == 1
+  #if HOTENDS == 1
     #if TEMP_SENSOR_0 != 0
       MENU_MULTIPLIER_ITEM_EDIT_CALLBACK(int3, MSG_NOZZLE, &thermalManager.target_temperature[0], 0, HEATER_0_MAXTEMP - 15, watch_temp_callback_E0);
     #endif
-  #else //EXTRUDERS > 1
+  #else //HOTENDS > 1
     #if TEMP_SENSOR_0 != 0
       MENU_MULTIPLIER_ITEM_EDIT_CALLBACK(int3, MSG_NOZZLE MSG_N1, &thermalManager.target_temperature[0], 0, HEATER_0_MAXTEMP - 15, watch_temp_callback_E0);
     #endif
     #if TEMP_SENSOR_1 != 0
       MENU_MULTIPLIER_ITEM_EDIT_CALLBACK(int3, MSG_NOZZLE MSG_N2, &thermalManager.target_temperature[1], 0, HEATER_1_MAXTEMP - 15, watch_temp_callback_E1);
     #endif
-    #if EXTRUDERS > 2
+    #if HOTENDS > 2
       #if TEMP_SENSOR_2 != 0
         MENU_MULTIPLIER_ITEM_EDIT_CALLBACK(int3, MSG_NOZZLE MSG_N3, &thermalManager.target_temperature[2], 0, HEATER_2_MAXTEMP - 15, watch_temp_callback_E2);
       #endif
-      #if EXTRUDERS > 3
+      #if HOTENDS > 3
         #if TEMP_SENSOR_3 != 0
           MENU_MULTIPLIER_ITEM_EDIT_CALLBACK(int3, MSG_NOZZLE MSG_N4, &thermalManager.target_temperature[3], 0, HEATER_3_MAXTEMP - 15, watch_temp_callback_E3);
         #endif
-      #endif // EXTRUDERS > 3
-    #endif // EXTRUDERS > 2
-  #endif // EXTRUDERS > 1
+      #endif // HOTENDS > 3
+    #endif // HOTENDS > 2
+  #endif // HOTENDS > 1
 
   //
   // Bed:
@@ -1574,18 +1606,18 @@ static void lcd_control_temperature_menu() {
       #define PID_MENU_ITEMS(ELABEL, eindex) _PID_MENU_ITEMS(ELABEL, eindex)
     #endif
 
-    #if ENABLED(PID_PARAMS_PER_EXTRUDER) && EXTRUDERS > 1
+    #if ENABLED(PID_PARAMS_PER_HOTEND) && HOTENDS > 1
       PID_MENU_ITEMS(MSG_E1, 0);
       PID_MENU_ITEMS(MSG_E2, 1);
-      #if EXTRUDERS > 2
+      #if HOTENDS > 2
         PID_MENU_ITEMS(MSG_E3, 2);
-        #if EXTRUDERS > 3
+        #if HOTENDS > 3
           PID_MENU_ITEMS(MSG_E4, 3);
-        #endif //EXTRUDERS > 3
-      #endif //EXTRUDERS > 2
-    #else //!PID_PARAMS_PER_EXTRUDER || EXTRUDERS == 1
+        #endif //HOTENDS > 3
+      #endif //HOTENDS > 2
+    #else //!PID_PARAMS_PER_HOTEND || HOTENDS == 1
       PID_MENU_ITEMS("", 0);
-    #endif //!PID_PARAMS_PER_EXTRUDER || EXTRUDERS == 1
+    #endif //!PID_PARAMS_PER_HOTEND || HOTENDS == 1
 
   #endif //PIDTEMP
 
@@ -1736,23 +1768,18 @@ static void lcd_control_volumetric_menu() {
   static void lcd_set_contrast() {
     ENCODER_DIRECTION_NORMAL();
     if (encoderPosition) {
-      #if ENABLED(U8GLIB_LM6059_AF)
-        lcd_contrast += encoderPosition;
-        lcd_contrast &= 0xFF;
-      #else
-        lcd_contrast -= encoderPosition;
-        lcd_contrast &= 0x3F;
-      #endif
+      set_lcd_contrast(lcd_contrast + encoderPosition);
       encoderPosition = 0;
       lcdDrawUpdate = LCDVIEW_REDRAW_NOW;
-      u8g.setContrast(lcd_contrast);
     }
     if (lcdDrawUpdate) {
-      #if ENABLED(U8GLIB_LM6059_AF)
-        lcd_implementation_drawedit(PSTR(MSG_CONTRAST), itostr3(lcd_contrast));
-      #else
-        lcd_implementation_drawedit(PSTR(MSG_CONTRAST), itostr2(lcd_contrast));
-      #endif
+      lcd_implementation_drawedit(PSTR(MSG_CONTRAST),
+        #if LCD_CONTRAST_MAX >= 100
+          itostr3(lcd_contrast)
+        #else
+          itostr2(lcd_contrast)
+        #endif
+      );
     }
     if (LCD_CLICKED) lcd_goto_previous_menu(true);
   }
@@ -1906,11 +1933,11 @@ static void lcd_control_volumetric_menu() {
 menu_edit_type(int, int3, itostr3, 1);
 menu_edit_type(float, float3, ftostr3, 1);
 menu_edit_type(float, float32, ftostr32, 100);
-menu_edit_type(float, float43, ftostr43, 1000);
-menu_edit_type(float, float5, ftostr5, 0.01);
-menu_edit_type(float, float51, ftostr51, 10);
-menu_edit_type(float, float52, ftostr52, 100);
-menu_edit_type(unsigned long, long5, ftostr5, 0.01);
+menu_edit_type(float, float43, ftostr43sign, 1000);
+menu_edit_type(float, float5, ftostr5rj, 0.01);
+menu_edit_type(float, float51, ftostr51sign, 10);
+menu_edit_type(float, float52, ftostr52sign, 100);
+menu_edit_type(unsigned long, long5, ftostr5rj, 0.01);
 
 /**
  *
@@ -2170,6 +2197,8 @@ void lcd_update() {
     static millis_t return_to_status_ms = 0;
   #endif
 
+  manage_manual_move();
+
   lcd_buttons_update();
 
   #if ENABLED(SDSUPPORT) && PIN_EXISTS(SD_DETECT)
@@ -2373,7 +2402,7 @@ void set_utf_strlen(char* s, uint8_t n) {
     i++;
   }
   while (j++ < n) s[i++] = ' ';
-  s[i] = 0;
+  s[i] = '\0';
 }
 
 bool lcd_hasstatus() { return (lcd_status_message[0] != '\0'); }
@@ -2404,8 +2433,8 @@ void lcd_setalertstatuspgm(const char* message) {
 void lcd_reset_alert_level() { lcd_status_message_level = 0; }
 
 #if HAS_LCD_CONTRAST
-  void lcd_setcontrast(uint8_t value) {
-    lcd_contrast = value & 0x3F;
+  void set_lcd_contrast(int value) {
+    lcd_contrast = constrain(value, LCD_CONTRAST_MIN, LCD_CONTRAST_MAX);
     u8g.setContrast(lcd_contrast);
   }
 #endif
@@ -2547,6 +2576,9 @@ void lcd_reset_alert_level() { lcd_status_message_level = 0; }
 /** Number to string conversion **/
 /*********************************/
 
+#define DIGIT(n) ('0' + (n))
+#define DIGIMOD(n) DIGIT((n) % 10)
+
 char conv[8];
 
 // Convert float to rj string with 123 or -12 format
@@ -2559,52 +2591,40 @@ char *ftostr4sign(const float& x) { return itostr4sign((int)x); }
 char* itostr2(const uint8_t& x) {
   //sprintf(conv,"%5.1f",x);
   int xx = x;
-  conv[0] = (xx / 10) % 10 + '0';
-  conv[1] = xx % 10 + '0';
-  conv[2] = 0;
+  conv[0] = DIGIMOD(xx / 10);
+  conv[1] = DIGIMOD(xx);
+  conv[2] = '\0';
   return conv;
 }
 
 // Convert float to string with +123.4 / -123.4 format
-char* ftostr31(const float& x) {
-  int xx = abs(x * 10);
-  conv[0] = (x >= 0) ? '+' : '-';
-  conv[1] = (xx / 1000) % 10 + '0';
-  conv[2] = (xx / 100) % 10 + '0';
-  conv[3] = (xx / 10) % 10 + '0';
+char* ftostr41sign(const float& x) {
+  int xx = int(abs(x * 10)) % 10000;
+  conv[0] = x >= 0 ? '+' : '-';
+  conv[1] = DIGIMOD(xx / 1000);
+  conv[2] = DIGIMOD(xx / 100);
+  conv[3] = DIGIMOD(xx / 10);
   conv[4] = '.';
-  conv[5] = xx % 10 + '0';
-  conv[6] = 0;
-  return conv;
-}
-
-// Convert unsigned float to string with 123.4 format, dropping sign
-char* ftostr31ns(const float& x) {
-  int xx = abs(x * 10);
-  conv[0] = (xx / 1000) % 10 + '0';
-  conv[1] = (xx / 100) % 10 + '0';
-  conv[2] = (xx / 10) % 10 + '0';
-  conv[3] = '.';
-  conv[4] = xx % 10 + '0';
-  conv[5] = 0;
+  conv[5] = DIGIMOD(xx);
+  conv[6] = '\0';
   return conv;
 }
 
 // Convert signed float to string with 023.45 / -23.45 format
 char *ftostr32(const float& x) {
   long xx = abs(x * 100);
-  conv[0] = x >= 0 ? (xx / 10000) % 10 + '0' : '-';
-  conv[1] = (xx / 1000) % 10 + '0';
-  conv[2] = (xx / 100) % 10 + '0';
+  conv[0] = x >= 0 ? DIGIMOD(xx / 10000) : '-';
+  conv[1] = DIGIMOD(xx / 1000);
+  conv[2] = DIGIMOD(xx / 100);
   conv[3] = '.';
-  conv[4] = (xx / 10) % 10 + '0';
-  conv[5] = xx % 10 + '0';
-  conv[6] = 0;
+  conv[4] = DIGIMOD(xx / 10);
+  conv[5] = DIGIMOD(xx);
+  conv[6] = '\0';
   return conv;
 }
 
 // Convert signed float to string (6 digit) with -1.234 / _0.000 / +1.234 format
-char* ftostr43(const float& x, char plus/*=' '*/) {
+char* ftostr43sign(const float& x, char plus/*=' '*/) {
   long xx = x * 1000;
   if (xx == 0)
     conv[0] = ' ';
@@ -2614,12 +2634,12 @@ char* ftostr43(const float& x, char plus/*=' '*/) {
     xx = -xx;
     conv[0] = '-';
   }
-  conv[1] = (xx / 1000) % 10 + '0';
+  conv[1] = DIGIMOD(xx / 1000);
   conv[2] = '.';
-  conv[3] = (xx / 100) % 10 + '0';
-  conv[4] = (xx / 10) % 10 + '0';
-  conv[5] = (xx) % 10 + '0';
-  conv[6] = 0;
+  conv[3] = DIGIMOD(xx / 100);
+  conv[4] = DIGIMOD(xx / 10);
+  conv[5] = DIGIMOD(xx);
+  conv[6] = '\0';
   return conv;
 }
 
@@ -2627,57 +2647,11 @@ char* ftostr43(const float& x, char plus/*=' '*/) {
 char* ftostr12ns(const float& x) {
   long xx = x * 100;
   xx = abs(xx);
-  conv[0] = (xx / 100) % 10 + '0';
+  conv[0] = DIGIMOD(xx / 100);
   conv[1] = '.';
-  conv[2] = (xx / 10) % 10 + '0';
-  conv[3] = (xx) % 10 + '0';
-  conv[4] = 0;
-  return conv;
-}
-
-// Convert signed float to space-padded string with -_23.4_ format
-char* ftostr32sp(const float& x) {
-  long xx = x * 100;
-  uint8_t dig;
-  if (xx < 0) { // negative val = -_0
-    xx = -xx;
-    conv[0] = '-';
-    dig = (xx / 1000) % 10;
-    conv[1] = dig ? '0' + dig : ' ';
-  }
-  else { // positive val = __0
-    dig = (xx / 10000) % 10;
-    if (dig) {
-      conv[0] = '0' + dig;
-      conv[1] = '0' + (xx / 1000) % 10;
-    }
-    else {
-      conv[0] = ' ';
-      dig = (xx / 1000) % 10;
-      conv[1] = dig ? '0' + dig : ' ';
-    }
-  }
-
-  conv[2] = '0' + (xx / 100) % 10; // lsd always
-
-  dig = xx % 10;
-  if (dig) { // 2 decimal places
-    conv[5] = '0' + dig;
-    conv[4] = '0' + (xx / 10) % 10;
-    conv[3] = '.';
-  }
-  else { // 1 or 0 decimal place
-    dig = (xx / 10) % 10;
-    if (dig) {
-      conv[4] = '0' + dig;
-      conv[3] = '.';
-    }
-    else {
-      conv[3] = conv[4] = ' ';
-    }
-    conv[5] = ' ';
-  }
-  conv[6] = '\0';
+  conv[2] = DIGIMOD(xx / 10);
+  conv[3] = DIGIMOD(xx);
+  conv[4] = '\0';
   return conv;
 }
 
@@ -2692,12 +2666,12 @@ char* itostr3sign(const int& x) {
     conv[0] = '-';
     xx = -x;
   }
-  conv[1] = (xx / 100) % 10 + '0';
-  conv[2] = (xx / 10) % 10 + '0';
-  conv[3] = xx % 10 + '0';
+  conv[1] = DIGIMOD(xx / 100);
+  conv[2] = DIGIMOD(xx / 10);
+  conv[3] = DIGIMOD(xx);
   conv[4] = '.';
   conv[5] = '0';
-  conv[6] = 0;
+  conv[6] = '\0';
   return conv;
 }
 
@@ -2709,41 +2683,31 @@ char* itostr3(const int& x) {
     xx = -xx;
   }
   else
-    conv[0] = xx >= 100 ? (xx / 100) % 10 + '0' : ' ';
+    conv[0] = xx >= 100 ? DIGIMOD(xx / 100) : ' ';
 
-  conv[1] = xx >= 10 ? (xx / 10) % 10 + '0' : ' ';
-  conv[2] = xx % 10 + '0';
-  conv[3] = 0;
+  conv[1] = xx >= 10 ? DIGIMOD(xx / 10) : ' ';
+  conv[2] = DIGIMOD(xx);
+  conv[3] = '\0';
   return conv;
 }
 
 // Convert unsigned int to lj string with 123 format
-char* itostr3left(const int& x) {
-  if (x >= 100) {
-    conv[0] = (x / 100) % 10 + '0';
-    conv[1] = (x / 10) % 10 + '0';
-    conv[2] = x % 10 + '0';
-    conv[3] = 0;
+char* itostr3left(const int& xx) {
+  if (xx >= 100) {
+    conv[0] = DIGIMOD(xx / 100);
+    conv[1] = DIGIMOD(xx / 10);
+    conv[2] = DIGIMOD(xx);
+    conv[3] = '\0';
   }
-  else if (x >= 10) {
-    conv[0] = (x / 10) % 10 + '0';
-    conv[1] = x % 10 + '0';
-    conv[2] = 0;
+  else if (xx >= 10) {
+    conv[0] = DIGIMOD(xx / 10);
+    conv[1] = DIGIMOD(xx);
+    conv[2] = '\0';
   }
   else {
-    conv[0] = x % 10 + '0';
-    conv[1] = 0;
+    conv[0] = DIGIMOD(xx);
+    conv[1] = '\0';
   }
-  return conv;
-}
-
-// Convert unsigned int to rj string with 1234 format
-char* itostr4(const int& x) {
-  conv[0] = x >= 1000 ? (x / 1000) % 10 + '0' : ' ';
-  conv[1] = x >= 100 ? (x / 100) % 10 + '0' : ' ';
-  conv[2] = x >= 10 ? (x / 10) % 10 + '0' : ' ';
-  conv[3] = x % 10 + '0';
-  conv[4] = 0;
   return conv;
 }
 
@@ -2752,13 +2716,13 @@ char *itostr4sign(const int& x) {
   int xx = abs(x);
   int sign = 0;
   if (xx >= 100) {
-    conv[1] = (xx / 100) % 10 + '0';
-    conv[2] = (xx / 10) % 10 + '0';
+    conv[1] = DIGIMOD(xx / 100);
+    conv[2] = DIGIMOD(xx / 10);
   }
   else if (xx >= 10) {
     conv[0] = ' ';
     sign = 1;
-    conv[2] = (xx / 10) % 10 + '0';
+    conv[2] = DIGIMOD(xx / 10);
   }
   else {
     conv[0] = ' ';
@@ -2766,48 +2730,94 @@ char *itostr4sign(const int& x) {
     sign = 2;
   }
   conv[sign] = x < 0 ? '-' : ' ';
-  conv[3] = xx % 10 + '0';
-  conv[4] = 0;
+  conv[3] = DIGIMOD(xx);
+  conv[4] = '\0';
   return conv;
 }
 
 // Convert unsigned float to rj string with 12345 format
-char* ftostr5(const float& x) {
+char* ftostr5rj(const float& x) {
   long xx = abs(x);
-  conv[0] = xx >= 10000 ? (xx / 10000) % 10 + '0' : ' ';
-  conv[1] = xx >= 1000 ? (xx / 1000) % 10 + '0' : ' ';
-  conv[2] = xx >= 100 ? (xx / 100) % 10 + '0' : ' ';
-  conv[3] = xx >= 10 ? (xx / 10) % 10 + '0' : ' ';
-  conv[4] = xx % 10 + '0';
-  conv[5] = 0;
+  conv[0] = xx >= 10000 ? DIGIMOD(xx / 10000) : ' ';
+  conv[1] = xx >= 1000 ? DIGIMOD(xx / 1000) : ' ';
+  conv[2] = xx >= 100 ? DIGIMOD(xx / 100) : ' ';
+  conv[3] = xx >= 10 ? DIGIMOD(xx / 10) : ' ';
+  conv[4] = DIGIMOD(xx);
+  conv[5] = '\0';
   return conv;
 }
 
 // Convert signed float to string with +1234.5 format
-char* ftostr51(const float& x) {
+char* ftostr51sign(const float& x) {
   long xx = abs(x * 10);
   conv[0] = (x >= 0) ? '+' : '-';
-  conv[1] = (xx / 10000) % 10 + '0';
-  conv[2] = (xx / 1000) % 10 + '0';
-  conv[3] = (xx / 100) % 10 + '0';
-  conv[4] = (xx / 10) % 10 + '0';
+  conv[1] = DIGIMOD(xx / 10000);
+  conv[2] = DIGIMOD(xx / 1000);
+  conv[3] = DIGIMOD(xx / 100);
+  conv[4] = DIGIMOD(xx / 10);
   conv[5] = '.';
-  conv[6] = xx % 10 + '0';
-  conv[7] = 0;
+  conv[6] = DIGIMOD(xx);
+  conv[7] = '\0';
   return conv;
 }
 
 // Convert signed float to string with +123.45 format
-char* ftostr52(const float& x) {
-  conv[0] = (x >= 0) ? '+' : '-';
+char* ftostr52sign(const float& x) {
   long xx = abs(x * 100);
-  conv[1] = (xx / 10000) % 10 + '0';
-  conv[2] = (xx / 1000) % 10 + '0';
-  conv[3] = (xx / 100) % 10 + '0';
+  conv[0] = (x >= 0) ? '+' : '-';
+  conv[1] = DIGIMOD(xx / 10000);
+  conv[2] = DIGIMOD(xx / 1000);
+  conv[3] = DIGIMOD(xx / 100);
   conv[4] = '.';
-  conv[5] = (xx / 10) % 10 + '0';
-  conv[6] = xx % 10 + '0';
-  conv[7] = 0;
+  conv[5] = DIGIMOD(xx / 10);
+  conv[6] = DIGIMOD(xx);
+  conv[7] = '\0';
+  return conv;
+}
+
+// Convert signed float to space-padded string with -_23.4_ format
+char* ftostr52sp(const float& x) {
+  long xx = x * 100;
+  uint8_t dig;
+  if (xx < 0) { // negative val = -_0
+    xx = -xx;
+    conv[0] = '-';
+    dig = (xx / 1000) % 10;
+    conv[1] = dig ? DIGIT(dig) : ' ';
+  }
+  else { // positive val = __0
+    dig = (xx / 10000) % 10;
+    if (dig) {
+      conv[0] = DIGIT(dig);
+      conv[1] = DIGIMOD(xx / 1000);
+    }
+    else {
+      conv[0] = ' ';
+      dig = (xx / 1000) % 10;
+      conv[1] = dig ? DIGIT(dig) : ' ';
+    }
+  }
+
+  conv[2] = DIGIMOD(xx / 100); // lsd always
+
+  dig = xx % 10;
+  if (dig) { // 2 decimal places
+    conv[5] = DIGIT(dig);
+    conv[4] = DIGIMOD(xx / 10);
+    conv[3] = '.';
+  }
+  else { // 1 or 0 decimal place
+    dig = (xx / 10) % 10;
+    if (dig) {
+      conv[4] = DIGIT(dig);
+      conv[3] = '.';
+    }
+    else {
+      conv[3] = conv[4] = ' ';
+    }
+    conv[5] = ' ';
+  }
+  conv[6] = '\0';
   return conv;
 }
 

@@ -132,8 +132,8 @@
 // Offset of the extruders (uncomment if using more than one and relying on firmware to position when changing).
 // The offset has to be X=0, Y=0 for the extruder 0 hotend (default extruder).
 // For the other hotends it is their distance from the extruder 0 hotend.
-//#define EXTRUDER_OFFSET_X {0.0, 20.00} // (in mm) for each extruder, offset of the hotend on the X axis
-//#define EXTRUDER_OFFSET_Y {0.0, 5.00}  // (in mm) for each extruder, offset of the hotend on the Y axis
+//#define HOTEND_OFFSET_X {0.0, 20.00} // (in mm) for each extruder, offset of the hotend on the X axis
+//#define HOTEND_OFFSET_Y {0.0, 5.00}  // (in mm) for each extruder, offset of the hotend on the Y axis
 
 //// The following define selects which power supply you have. Please choose the one that matches your setup
 // 1 = ATX
@@ -230,8 +230,8 @@
 #define BED_MAXTEMP 150
 
 // If you want the M105 heater power reported in watts, define the BED_WATTS, and (shared for all extruders) EXTRUDER_WATTS
-//#define EXTRUDER_WATTS (12.0*12.0/6.7) // P=U^2/R
-//#define BED_WATTS (12.0*12.0/1.1)      // P=U^2/R
+//#define HOTEND_WATTS (12.0*12.0/6.7) // P=U^2/R
+//#define BED_WATTS (12.0*12.0/1.1)    // P=U^2/R
 
 //===========================================================================
 //============================= PID Settings ================================
@@ -247,8 +247,8 @@
   //#define PID_DEBUG // Sends debug data to the serial port.
   //#define PID_OPENLOOP 1 // Puts PID in open loop. M104/M140 sets the output power from 0 to PID_MAX
   //#define SLOW_PWM_HEATERS // PWM with very low frequency (roughly 0.125Hz=8s) and minimum state time of approximately 1s useful for heaters driven by a relay
-  //#define PID_PARAMS_PER_EXTRUDER // Uses separate PID parameters for each extruder (useful for mismatched extruders)
-                                    // Set/get with gcode: M301 E[extruder number, 0-2]
+  //#define PID_PARAMS_PER_HOTEND // Uses separate PID parameters for each extruder (useful for mismatched extruders)
+                                  // Set/get with gcode: M301 E[extruder number, 0-2]
   #define PID_FUNCTIONAL_RANGE 50 // If the temperature difference between the target temperature and the actual temperature
                                   // is more than PID_FUNCTIONAL_RANGE then the PID will be shut off and the heater will be set to min/max.
   #define PID_INTEGRAL_DRIVE_MAX PID_MAX  //limit for the integral term
@@ -471,6 +471,12 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = false; // set to true to invert the l
 // If you're using the Z MIN endstop connector for your Z probe, this has no effect.
 //#define DISABLE_Z_MIN_PROBE_ENDSTOP
 
+// Probe Raise options provide clearance for the probe to deploy and stow.
+// For G28 these apply when the probe deploys and stows.
+// For G29 these apply before and after the full procedure.
+#define Z_RAISE_BEFORE_PROBING 100  // Raise before probe deploy (e.g., the first probe).
+#define Z_RAISE_AFTER_PROBING 15    // Raise before probe stow (e.g., the last probe).
+
 // For Inverting Stepper Enable Pins (Active Low) use 0, Non Inverting (Active High) use 1
 // :{0:'Low',1:'High'}
 #define X_ENABLE_ON 0
@@ -620,7 +626,7 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = false; // set to true to invert the l
     #define ABL_PROBE_PT_3_X 170
     #define ABL_PROBE_PT_3_Y 20
 
-  #endif // AUTO_BED_LEVELING_GRID
+  #endif // !AUTO_BED_LEVELING_GRID
 
   // Z Probe to nozzle (X,Y) offset, relative to (0, 0).
   // X and Y offsets must be integers.
@@ -647,9 +653,7 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = false; // set to true to invert the l
 
   #define XY_TRAVEL_SPEED 8000         // X and Y axis travel speed between probes, in mm/min.
 
-  #define Z_RAISE_BEFORE_PROBING 100  // How much the Z axis will be raised before traveling to the first probing point.
   #define Z_RAISE_BETWEEN_PROBINGS 5  // How much the Z axis will be raised when traveling from between next probing points.
-  #define Z_RAISE_AFTER_PROBING 15    // How much the Z axis will be raised after the last probing point.
 
   //#define Z_PROBE_END_SCRIPT "G1 Z10 F12000\nG1 X15 Y330\nG1 Z0.5\nG1 Z10" // These commands will be executed in the end of G29 routine.
                                                                              // Useful to retract a deployable Z probe.
@@ -830,6 +834,16 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = false; // set to true to invert the l
 // M100 Free Memory Watcher
 //
 //#define M100_FREE_MEMORY_WATCHER // uncomment to add the M100 Free Memory Watcher for debug purpose
+
+//
+// G20/G21 Inch mode support
+//
+//#define INCH_MODE_SUPPORT
+
+//
+// M149 Set temperature units support
+//
+//#define TEMPERATURE_UNITS_SUPPORT
 
 // @section temperature
 

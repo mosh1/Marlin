@@ -71,6 +71,64 @@
 
 Planner planner;
 
+  // public:
+
+/**
+ * A ring buffer of moves described in steps
+ */
+block_t Planner::block_buffer[BLOCK_BUFFER_SIZE];
+volatile uint8_t Planner::block_buffer_head = 0;           // Index of the next block to be pushed
+volatile uint8_t Planner::block_buffer_tail = 0;
+
+float Planner::max_feedrate[NUM_AXIS]; // Max speeds in mm per minute
+float Planner::axis_steps_per_unit[NUM_AXIS];
+unsigned long Planner::axis_steps_per_sqr_second[NUM_AXIS];
+unsigned long Planner::max_acceleration_units_per_sq_second[NUM_AXIS]; // Use M201 to override by software
+
+millis_t Planner::min_segment_time;
+float Planner::min_feedrate;
+float Planner::acceleration;         // Normal acceleration mm/s^2  DEFAULT ACCELERATION for all printing moves. M204 SXXXX
+float Planner::retract_acceleration; // Retract acceleration mm/s^2 filament pull-back and push-forward while standing still in the other axes M204 TXXXX
+float Planner::travel_acceleration;  // Travel acceleration mm/s^2  DEFAULT ACCELERATION for all NON printing moves. M204 MXXXX
+float Planner::max_xy_jerk;          // The largest speed change requiring no acceleration
+float Planner::max_z_jerk;
+float Planner::max_e_jerk;
+float Planner::min_travel_feedrate;
+
+#if ENABLED(AUTO_BED_LEVELING_FEATURE)
+  matrix_3x3 Planner::bed_level_matrix; // Transform to compensate for bed level
+#endif
+
+#if ENABLED(AUTOTEMP)
+  float Planner::autotemp_max = 250;
+  float Planner::autotemp_min = 210;
+  float Planner::autotemp_factor = 0.1;
+  bool Planner::autotemp_enabled = false;
+#endif
+
+// private:
+
+long Planner::position[NUM_AXIS] = { 0 };
+
+float Planner::previous_speed[NUM_AXIS];
+
+float Planner::previous_nominal_speed;
+
+#if ENABLED(DISABLE_INACTIVE_EXTRUDER)
+  uint8_t Planner::g_uc_extruder_last_move[EXTRUDERS] = { 0 };
+#endif // DISABLE_INACTIVE_EXTRUDER
+
+#ifdef XY_FREQUENCY_LIMIT
+  // Old direction bits. Used for speed calculations
+  unsigned char Planner::old_direction_bits = 0;
+  // Segment times (in µs). Used for speed calculations
+  long Planner::axis_segment_time[2][3] = { {MAX_FREQ_TIME + 1, 0, 0}, {MAX_FREQ_TIME + 1, 0, 0} };
+#endif
+
+/**
+ * Class and Instance Methods
+ */
+
 Planner::Planner() {
   #if ENABLED(AUTO_BED_LEVELING_FEATURE)
     bed_level_matrix.set_to_identity();
@@ -97,18 +155,18 @@ void Planner::calculate_trapezoid_for_block(block_t* block, float entry_factor, 
   NOLESS(initial_rate, 120);
   NOLESS(final_rate, 120);
 
-  long acceleration = block->acceleration_st;
-  int32_t accelerate_steps = ceil(estimate_acceleration_distance(initial_rate, block->nominal_rate, acceleration));
-  int32_t decelerate_steps = floor(estimate_acceleration_distance(block->nominal_rate, final_rate, -acceleration));
+  long accel = block->acceleration_st;
+  int32_t accelerate_steps = ceil(estimate_acceleration_distance(initial_rate, block->nominal_rate, accel));
+  int32_t decelerate_steps = floor(estimate_acceleration_distance(block->nominal_rate, final_rate, -accel));
 
   // Calculate the size of Plateau of Nominal Rate.
   int32_t plateau_steps = block->step_event_count - accelerate_steps - decelerate_steps;
 
   // Is the Plateau of Nominal Rate smaller than nothing? That means no cruising, and we will
-  // have to use intersection_distance() to calculate when to abort acceleration and start braking
+  // have to use intersection_distance() to calculate when to abort accel and start braking
   // in order to reach the final_rate exactly at the end of this block.
   if (plateau_steps < 0) {
-    accelerate_steps = ceil(intersection_distance(initial_rate, final_rate, acceleration, block->step_event_count));
+    accelerate_steps = ceil(intersection_distance(initial_rate, final_rate, accel, block->step_event_count));
     accelerate_steps = max(accelerate_steps, 0); // Check limits due to numerical round-off
     accelerate_steps = min((uint32_t)accelerate_steps, block->step_event_count);//(We can cast here to unsigned, because the above line ensures that we are above zero)
     plateau_steps = 0;
@@ -481,7 +539,8 @@ void Planner::check_axes_activity() {
   while (block_buffer_tail == next_buffer_head) idle();
 
   #if ENABLED(MESH_BED_LEVELING)
-    if (mbl.active) z += mbl.get_z(x - home_offset[X_AXIS], y - home_offset[Y_AXIS]);
+    if (mbl.active()) 
+      z += mbl.get_z(x - home_offset[X_AXIS], y - home_offset[Y_AXIS]);
   #elif ENABLED(AUTO_BED_LEVELING_FEATURE)
     apply_rotation_xyz(bed_level_matrix, x, y, z);
   #endif
@@ -1056,13 +1115,14 @@ void Planner::check_axes_activity() {
  * On CORE machines stepper ABC will be translated from the given XYZ.
  */
 #if ENABLED(AUTO_BED_LEVELING_FEATURE) || ENABLED(MESH_BED_LEVELING)
-  void Planner::set_position(float x, float y, float z, const float& e)
+  void Planner::set_position_mm(float x, float y, float z, const float& e)
 #else
-  void Planner::set_position(const float& x, const float& y, const float& z, const float& e)
+  void Planner::set_position_mm(const float& x, const float& y, const float& z, const float& e)
 #endif // AUTO_BED_LEVELING_FEATURE || MESH_BED_LEVELING
   {
     #if ENABLED(MESH_BED_LEVELING)
-      if (mbl.active) z += mbl.get_z(x - home_offset[X_AXIS], y - home_offset[Y_AXIS]);
+      if (mbl.active())
+        z += mbl.get_z(x - home_offset[X_AXIS], y - home_offset[Y_AXIS]);
     #elif ENABLED(AUTO_BED_LEVELING_FEATURE)
       apply_rotation_xyz(bed_level_matrix, x, y, z);
     #endif
@@ -1080,7 +1140,7 @@ void Planner::check_axes_activity() {
 /**
  * Directly set the planner E position (hence the stepper E position).
  */
-void Planner::set_e_position(const float& e) {
+void Planner::set_e_position_mm(const float& e) {
   position[E_AXIS] = lround(e * axis_steps_per_unit[E_AXIS]);
   stepper.set_e_position(position[E_AXIS]);
 }
@@ -1095,9 +1155,9 @@ void Planner::reset_acceleration_rates() {
 
   void Planner::autotemp_M109() {
     autotemp_enabled = code_seen('F');
-    if (autotemp_enabled) autotemp_factor = code_value();
-    if (code_seen('S')) autotemp_min = code_value();
-    if (code_seen('B')) autotemp_max = code_value();
+    if (autotemp_enabled) autotemp_factor = code_value_temp_diff();
+    if (code_seen('S')) autotemp_min = code_value_temp_abs();
+    if (code_seen('B')) autotemp_max = code_value_temp_abs();
   }
 
 #endif

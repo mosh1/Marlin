@@ -58,8 +58,8 @@
  *  188  M206 XYZ  home_offset (float x3)
  *
  * Mesh bed leveling:
- *  200  M420 S    active (bool)
- *  201            z_offset (float) (added in V23)
+ *  200  M420 S    status (uint8)
+ *  201            z_offset (float)
  *  205            mesh_num_x (uint8 as set in firmware)
  *  206            mesh_num_y (uint8 as set in firmware)
  *  207 G29 S3 XYZ z_values[][] (float x9, by default)
@@ -187,20 +187,21 @@ void Config_StoreSettings()  {
   EEPROM_WRITE_VAR(i, planner.max_e_jerk);
   EEPROM_WRITE_VAR(i, home_offset);
 
-  uint8_t mesh_num_x = 3;
-  uint8_t mesh_num_y = 3;
   #if ENABLED(MESH_BED_LEVELING)
     // Compile time test that sizeof(mbl.z_values) is as expected
     typedef char c_assert[(sizeof(mbl.z_values) == (MESH_NUM_X_POINTS) * (MESH_NUM_Y_POINTS) * sizeof(dummy)) ? 1 : -1];
-    mesh_num_x = MESH_NUM_X_POINTS;
-    mesh_num_y = MESH_NUM_Y_POINTS;
-    EEPROM_WRITE_VAR(i, mbl.active);
+    uint8_t mesh_num_x = MESH_NUM_X_POINTS,
+            mesh_num_y = MESH_NUM_Y_POINTS,
+            dummy_uint8 = mbl.status & _BV(MBL_STATUS_HAS_MESH_BIT);
+    EEPROM_WRITE_VAR(i, dummy_uint8);
     EEPROM_WRITE_VAR(i, mbl.z_offset);
     EEPROM_WRITE_VAR(i, mesh_num_x);
     EEPROM_WRITE_VAR(i, mesh_num_y);
     EEPROM_WRITE_VAR(i, mbl.z_values);
   #else
-    uint8_t dummy_uint8 = 0;
+    uint8_t mesh_num_x = 3,
+            mesh_num_y = 3,
+            dummy_uint8 = 0;
     dummy = 0.0f;
     EEPROM_WRITE_VAR(i, dummy_uint8);
     EEPROM_WRITE_VAR(i, dummy);
@@ -246,7 +247,7 @@ void Config_StoreSettings()  {
   for (uint8_t e = 0; e < 4; e++) {
 
     #if ENABLED(PIDTEMP)
-      if (e < EXTRUDERS) {
+      if (e < HOTENDS) {
         EEPROM_WRITE_VAR(i, PID_PARAM(Kp, e));
         EEPROM_WRITE_VAR(i, PID_PARAM(Ki, e));
         EEPROM_WRITE_VAR(i, PID_PARAM(Kd, e));
@@ -266,7 +267,7 @@ void Config_StoreSettings()  {
         for (uint8_t q = 3; q--;) EEPROM_WRITE_VAR(i, dummy); // Ki, Kd, Kc
       }
 
-  } // Extruders Loop
+  } // Hotends Loop
 
   #if DISABLED(PID_ADD_EXTRUSION_RATE)
     int lpq_len = 20;
@@ -376,7 +377,7 @@ void Config_RetrieveSettings() {
     EEPROM_READ_VAR(i, mesh_num_x);
     EEPROM_READ_VAR(i, mesh_num_y);
     #if ENABLED(MESH_BED_LEVELING)
-      mbl.active = dummy_uint8;
+      mbl.status = dummy_uint8;
       mbl.z_offset = dummy;
       if (mesh_num_x == MESH_NUM_X_POINTS && mesh_num_y == MESH_NUM_Y_POINTS) {
         EEPROM_READ_VAR(i, mbl.z_values);
@@ -426,7 +427,7 @@ void Config_RetrieveSettings() {
     #if ENABLED(PIDTEMP)
       for (uint8_t e = 0; e < 4; e++) { // 4 = max extruders currently supported by Marlin
         EEPROM_READ_VAR(i, dummy); // Kp
-        if (e < EXTRUDERS && dummy != DUMMY_PID_VALUE) {
+        if (e < HOTENDS && dummy != DUMMY_PID_VALUE) {
           // do not need to scale PID values as the values in EEPROM are already scaled
           PID_PARAM(Kp, e) = dummy;
           EEPROM_READ_VAR(i, PID_PARAM(Ki, e));
@@ -550,7 +551,7 @@ void Config_ResetDefault() {
   home_offset[X_AXIS] = home_offset[Y_AXIS] = home_offset[Z_AXIS] = 0;
 
   #if ENABLED(MESH_BED_LEVELING)
-    mbl.active = false;
+    mbl.reset();
   #endif
 
   #if ENABLED(AUTO_BED_LEVELING_FEATURE)
@@ -584,8 +585,8 @@ void Config_ResetDefault() {
   #endif
 
   #if ENABLED(PIDTEMP)
-    #if ENABLED(PID_PARAMS_PER_EXTRUDER)
-      for (uint8_t e = 0; e < EXTRUDERS; e++)
+    #if ENABLED(PID_PARAMS_PER_HOTEND)
+      for (uint8_t e = 0; e < HOTENDS; e++)
     #else
       int e = 0; UNUSED(e); // only need to write once
     #endif
@@ -729,7 +730,7 @@ void Config_PrintSettings(bool forReplay) {
       SERIAL_ECHOLNPGM("Mesh bed leveling:");
       CONFIG_ECHO_START;
     }
-    SERIAL_ECHOPAIR("  M420 S", mbl.active);
+    SERIAL_ECHOPAIR("  M420 S", mbl.has_mesh() ? 1 : 0);
     SERIAL_ECHOPAIR(" X", MESH_NUM_X_POINTS);
     SERIAL_ECHOPAIR(" Y", MESH_NUM_Y_POINTS);
     SERIAL_EOL;
@@ -801,9 +802,9 @@ void Config_PrintSettings(bool forReplay) {
       SERIAL_ECHOLNPGM("PID settings:");
     }
     #if ENABLED(PIDTEMP)
-      #if EXTRUDERS > 1
+      #if HOTENDS > 1
         if (forReplay) {
-          for (uint8_t i = 0; i < EXTRUDERS; i++) {
+          for (uint8_t i = 0; i < HOTENDS; i++) {
             CONFIG_ECHO_START;
             SERIAL_ECHOPAIR("  M301 E", i);
             SERIAL_ECHOPAIR(" P", PID_PARAM(Kp, i));
@@ -817,8 +818,8 @@ void Config_PrintSettings(bool forReplay) {
           }
         }
         else
-      #endif // EXTRUDERS > 1
-      // !forReplay || EXTRUDERS == 1
+      #endif // HOTENDS > 1
+      // !forReplay || HOTENDS == 1
       {
         CONFIG_ECHO_START;
         SERIAL_ECHOPAIR("  M301 P", PID_PARAM(Kp, 0)); // for compatibility with hosts, only echo values for E0

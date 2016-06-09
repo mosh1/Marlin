@@ -61,10 +61,14 @@
     #define ULTIMAKERCONTROLLER //as available from the Ultimaker online store.
 
     #if ENABLED(miniVIKI)
+      #define LCD_CONTRAST_MIN  75
+      #define LCD_CONTRAST_MAX 115
       #define DEFAULT_LCD_CONTRAST 95
     #elif ENABLED(VIKI2)
       #define DEFAULT_LCD_CONTRAST 40
     #elif ENABLED(ELB_FULL_GRAPHIC_CONTROLLER)
+      #define LCD_CONTRAST_MIN  90
+      #define LCD_CONTRAST_MAX 130
       #define DEFAULT_LCD_CONTRAST 110
       #define U8GLIB_LM6059_AF
       #define SD_DETECT_INVERTED
@@ -245,9 +249,24 @@
    * Default LCD contrast for dogm-like LCD displays
    */
   #if ENABLED(DOGLCD)
-    #define HAS_LCD_CONTRAST (DISABLED(U8GLIB_ST7920) && DISABLED(U8GLIB_SSD1306) && DISABLED(U8GLIB_SH1106))
-    #if HAS_LCD_CONTRAST && !defined(DEFAULT_LCD_CONTRAST)
-      #define DEFAULT_LCD_CONTRAST 32
+
+    #define HAS_LCD_CONTRAST ( \
+        ENABLED(MAKRPANEL) \
+     || ENABLED(VIKI2) \
+     || ENABLED(miniVIKI) \
+     || ENABLED(ELB_FULL_GRAPHIC_CONTROLLER) \
+    )
+
+    #if HAS_LCD_CONTRAST
+      #ifndef LCD_CONTRAST_MIN
+        #define LCD_CONTRAST_MIN 0
+      #endif
+      #ifndef LCD_CONTRAST_MAX
+        #define LCD_CONTRAST_MAX 63
+      #endif
+      #ifndef DEFAULT_LCD_CONTRAST
+        #define DEFAULT_LCD_CONTRAST 32
+      #endif
     #endif
   #endif
 
@@ -517,6 +536,21 @@
   #define HAS_PID_FOR_BOTH (ENABLED(PIDTEMP) && ENABLED(PIDTEMPBED))
 
   /**
+   * SINGLENOZZLE needs to differentiate EXTRUDERS and HOTENDS
+   * And all "extruders" are in the same place.
+   */
+  #if ENABLED(SINGLENOZZLE)
+    #define HOTENDS 1
+    #undef TEMP_SENSOR_1_AS_REDUNDANT
+    #undef HOTEND_OFFSET_X
+    #undef HOTEND_OFFSET_Y
+    #define HOTEND_OFFSET_X { 0 }
+    #define HOTEND_OFFSET_Y { 0 }
+  #else
+    #define HOTENDS EXTRUDERS
+  #endif
+
+  /**
    * ARRAY_BY_EXTRUDERS based on EXTRUDERS
    */
   #if EXTRUDERS > 3
@@ -532,14 +566,19 @@
   #define ARRAY_BY_EXTRUDERS1(v1) ARRAY_BY_EXTRUDERS(v1, v1, v1, v1)
 
   /**
-   * With SINGLENOZZLE all "extruders" are in the same place
+   * ARRAY_BY_HOTENDS based on HOTENDS
    */
-  #if ENABLED(SINGLENOZZLE)
-    #undef EXTRUDER_OFFSET_X
-    #undef EXTRUDER_OFFSET_Y
-    #define EXTRUDER_OFFSET_X { 0 }
-    #define EXTRUDER_OFFSET_Y { 0 }
+  #if HOTENDS > 3
+    #define ARRAY_BY_HOTENDS(v1, v2, v3, v4) { v1, v2, v3, v4 }
+  #elif HOTENDS > 2
+    #define ARRAY_BY_HOTENDS(v1, v2, v3, v4) { v1, v2, v3 }
+  #elif HOTENDS > 1
+    #define ARRAY_BY_HOTENDS(v1, v2, v3, v4) { v1, v2 }
+  #else
+    #define ARRAY_BY_HOTENDS(v1, v2, v3, v4) { v1 }
   #endif
+
+  #define ARRAY_BY_HOTENDS1(v1) ARRAY_BY_HOTENDS(v1, v1, v1, v1)
 
   /**
    * Z_DUAL_ENDSTOPS endstop reassignment
@@ -676,11 +715,11 @@
    * Helper Macros for heaters and extruder fan
    */
   #define WRITE_HEATER_0P(v) WRITE(HEATER_0_PIN, v)
-  #if EXTRUDERS > 1 || ENABLED(HEATERS_PARALLEL)
+  #if HOTENDS > 1 || ENABLED(HEATERS_PARALLEL)
     #define WRITE_HEATER_1(v) WRITE(HEATER_1_PIN, v)
-    #if EXTRUDERS > 2
+    #if HOTENDS > 2
       #define WRITE_HEATER_2(v) WRITE(HEATER_2_PIN, v)
-      #if EXTRUDERS > 3
+      #if HOTENDS > 3
         #define WRITE_HEATER_3(v) WRITE(HEATER_3_PIN, v)
       #endif
     #endif
@@ -732,7 +771,7 @@
       #define Z_ENDSTOP_SERVO_NR -1
     #endif
     #if X_ENDSTOP_SERVO_NR >= 0 || Y_ENDSTOP_SERVO_NR >= 0 || HAS_Z_ENDSTOP_SERVO
-      #define HAS_SERVO_ENDSTOPS true
+      #define HAS_SERVO_ENDSTOPS
       #define SERVO_ENDSTOP_IDS { X_ENDSTOP_SERVO_NR, Y_ENDSTOP_SERVO_NR, Z_ENDSTOP_SERVO_NR }
     #endif
   #endif
