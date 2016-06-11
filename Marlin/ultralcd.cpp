@@ -1353,10 +1353,10 @@ static void lcd_move_menu() {
   //TODO:X,Y,Z,E
   
   if (axis_homed[Z_AXIS]) {
-	  MENU_ITEM(gcode, "Move Z to MAX", PSTR("G1 Z300 F3000"));
+	  MENU_ITEM(gcode, "Move Z to 295", PSTR("G1 Z295 F3000"));
   }
   else {
-      MENU_ITEM(gcode, "Move Z to MAX", PSTR("G28\nG1 Z300 F3000"));
+      MENU_ITEM(gcode, "Move Z to 295", PSTR("G28\nG1 Z295 F3000"));
   }
   
   END_MENU();
