@@ -227,7 +227,6 @@ void FlushSerialRequestResend();
 void ok_to_send();
 
 void reset_bed_level();
-void prepare_move();
 void kill(const char*);
 
 #if DISABLED(DELTA) && DISABLED(SCARA)
@@ -372,5 +371,16 @@ extern uint8_t active_extruder;
 #endif
 
 void calculate_volumetric_multipliers();
+
+// Buzzer
+#if HAS_BUZZER
+  #if ENABLED(SPEAKER)
+    #include "speaker.h"
+    extern Speaker buzzer;
+  #else
+    #include "buzzer.h"
+    extern Buzzer buzzer;
+  #endif
+#endif
 
 #endif //MARLIN_H

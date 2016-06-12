@@ -17,10 +17,10 @@ before_install:
   #
 install:
   #
-  # Install arduino 1.6.8
-  - wget http://downloads-02.arduino.cc/arduino-1.6.8-linux64.tar.xz
-  - tar xf arduino-1.6.8-linux64.tar.xz
-  - sudo mv arduino-1.6.8 /usr/local/share/arduino
+  # Install arduino 1.6.9
+  - wget http://downloads-02.arduino.cc/arduino-1.6.9-linux64.tar.xz
+  - tar xf arduino-1.6.9-linux64.tar.xz
+  - sudo mv arduino-1.6.9 /usr/local/share/arduino
   - ln -s /usr/local/share/arduino/arduino ${TRAVIS_BUILD_DIR}/buildroot/bin/arduino
   #
   # Install: LiquidCrystal_I2C library
@@ -105,7 +105,8 @@ script:
   - opt_enable NUM_SERVOS Z_ENDSTOP_SERVO_NR SERVO_ENDSTOP_ANGLES DEACTIVATE_SERVOS_AFTER_MOVE
   - build_marlin
   #
-  # Test EEPROM_SETTINGS, EEPROM_CHITCHAT, M100_FREE_MEMORY_WATCHER, INCH_MODE_SUPPORT, TEMPERATURE_UNITS_SUPPORT
+  # Test EEPROM_SETTINGS, EEPROM_CHITCHAT, M100_FREE_MEMORY_WATCHER,
+  #   INCH_MODE_SUPPORT, TEMPERATURE_UNITS_SUPPORT
   #
   - restore_configs
   - opt_enable EEPROM_SETTINGS EEPROM_CHITCHAT M100_FREE_MEMORY_WATCHER INCH_MODE_SUPPORT TEMPERATURE_UNITS_SUPPORT
@@ -121,77 +122,13 @@ script:
   - opt_enable_adv DUAL_X_CARRIAGE
   - build_marlin
   #
-  ### LCDS ###
-  #
-  #
-  # ULTIMAKERCONTROLLER
+  # Test SPEAKER with BOARD_BQ_ZUM_MEGA_3D and BQ_LCD_SMART_CONTROLLER
   #
   - restore_configs
-  - opt_enable ULTIMAKERCONTROLLER
-  - build_marlin
-  #
-  # MAKRPANEL
-  # Needs to use Melzi and Sanguino hardware
-  #
-  #- restore_configs
-  #- opt_enable MAKRPANEL
-  #- build_marlin
-  #
-  # REPRAP_DISCOUNT_SMART_CONTROLLER, SDSUPPORT, and BABYSTEPPING
-  #
-  - restore_configs
-  - opt_enable REPRAP_DISCOUNT_SMART_CONTROLLER SDSUPPORT BABYSTEPPING
-  - build_marlin
-  #
-  # G3D_PANEL
-  #
-  - restore_configs
-  - opt_enable G3D_PANEL SDSUPPORT
-  - build_marlin
-  #
-  # REPRAP_DISCOUNT_FULL_GRAPHIC_SMART_CONTROLLER
-  #
-  - restore_configs
-  - opt_enable REPRAP_DISCOUNT_FULL_GRAPHIC_SMART_CONTROLLER SDSUPPORT
-  - build_marlin
-  #
-  # REPRAPWORLD_KEYPAD
-  #
-  # Cant find configuration details to get it to compile
-  #- restore_configs
-  #- opt_enable ULTRA_LCD REPRAPWORLD_KEYPAD REPRAPWORLD_KEYPAD_MOVE_STEP
-  #- build_marlin
-  #
-  # RA_CONTROL_PANEL
-  #
-  - restore_configs
-  - opt_enable RA_CONTROL_PANEL
-  - build_marlin
-  #
-  ### I2C PANELS ###
-  #
-  # LCD_I2C_SAINSMART_YWROBOT
-  # Failing at the moment needs different library
-  #- restore_configs
-  #- opt_enable LCD_I2C_SAINSMART_YWROBOT
-  #- build_marlin
-  #
-  # LCD_I2C_PANELOLU2
-  #
-  - restore_configs
-  - opt_enable LCD_I2C_PANELOLU2
-  - build_marlin
-  #
-  # LCD_I2C_VIKI
-  #
-  - restore_configs
-  - opt_enable LCD_I2C_VIKI
-  - build_marlin
-  #
-  # LCM1602
-  #
-  - restore_configs
-  - opt_enable LCM1602
+  - opt_set MOTHERBOARD BOARD_BQ_ZUM_MEGA_3D
+  - opt_set LCD_FEEDBACK_FREQUENCY_DURATION_MS 10
+  - opt_set LCD_FEEDBACK_FREQUENCY_HZ 100
+  - opt_enable BQ_LCD_SMART_CONTROLLER SPEAKER
   - build_marlin
   #
   # Enable FILAMENTCHANGEENABLE
@@ -241,6 +178,95 @@ script:
   #
   - restore_configs
   - opt_enable PRINTCOUNTER
+  - build_marlin
+  #
+  #
+  ######## STANDARD LCD/PANELS ##############
+  #
+  # ULTRA_LCD
+  #
+  - restore_configs
+  - opt_enable ULTRA_LCD
+  - build_marlin
+  #
+  # DOGLCD
+  #
+  - restore_configs
+  - opt_enable DOGLCD
+  - build_marlin
+  #
+  # ULTIMAKERCONTROLLER
+  #
+  - restore_configs
+  - opt_enable ULTIMAKERCONTROLLER
+  - build_marlin
+  #
+  # MAKRPANEL
+  # Needs to use Melzi and Sanguino hardware
+  #
+  #- restore_configs
+  #- opt_enable MAKRPANEL
+  #- build_marlin
+  #
+  # REPRAP_DISCOUNT_SMART_CONTROLLER, SDSUPPORT, and BABYSTEPPING
+  #
+  - restore_configs
+  - opt_enable REPRAP_DISCOUNT_SMART_CONTROLLER SDSUPPORT BABYSTEPPING
+  - build_marlin
+  #
+  # G3D_PANEL
+  #
+  - restore_configs
+  - opt_enable G3D_PANEL SDSUPPORT
+  - build_marlin
+  #
+  # REPRAP_DISCOUNT_FULL_GRAPHIC_SMART_CONTROLLER
+  #
+  - restore_configs
+  - opt_enable REPRAP_DISCOUNT_FULL_GRAPHIC_SMART_CONTROLLER SDSUPPORT
+  - build_marlin
+  #
+  # REPRAPWORLD_KEYPAD
+  #
+  # Cant find configuration details to get it to compile
+  #- restore_configs
+  #- opt_enable ULTRA_LCD REPRAPWORLD_KEYPAD REPRAPWORLD_KEYPAD_MOVE_STEP
+  #- build_marlin
+  #
+  # RA_CONTROL_PANEL
+  #
+  - restore_configs
+  - opt_enable RA_CONTROL_PANEL
+  - build_marlin
+  #
+  ######## I2C LCD/PANELS ##############
+  #
+  # !!!ATTENTION!!!
+  # Most I2C configurations are failing at the moment because they require
+  # a different Liquid Crystal library "LiquidTWI2".
+  #
+  # LCD_I2C_SAINSMART_YWROBOT
+  #
+  #- restore_configs
+  #- opt_enable LCD_I2C_SAINSMART_YWROBOT
+  #- build_marlin
+  #
+  # LCD_I2C_PANELOLU2
+  #
+  #- restore_configs
+  #- opt_enable LCD_I2C_PANELOLU2
+  #- build_marlin
+  #
+  # LCD_I2C_VIKI
+  #
+  #- restore_configs
+  #- opt_enable LCD_I2C_VIKI
+  #- build_marlin
+  #
+  # LCM1602
+  #
+  - restore_configs
+  - opt_enable LCM1602
   - build_marlin
   #
   #
