@@ -333,7 +333,7 @@ const char axis_codes[NUM_AXIS] = {'X', 'Y', 'Z', 'E'};
 
 static int serial_count = 0;
 
-// GCode parameter pointer used by code_seen(), code_value(), etc.
+// GCode parameter pointer used by code_seen(), code_value_float(), etc.
 static char* seen_pointer;
 
 // Next Immediate GCode Command pointer. NULL if none.
@@ -859,8 +859,6 @@ void setup() {
   // loads data from EEPROM if available else uses defaults (and resets step acceleration rate)
   Config_RetrieveSettings();
 
-  lcd_init();
-
   thermalManager.init();    // Initialize temperature loop
 
   #if ENABLED(DELTA) || ENABLED(SCARA)
@@ -907,6 +905,16 @@ void setup() {
   #ifdef STAT_LED_BLUE
     pinMode(STAT_LED_BLUE, OUTPUT);
     digitalWrite(STAT_LED_BLUE, LOW); // turn it off
+  #endif
+
+  lcd_init();
+  #if ENABLED(SHOW_BOOTSCREEN)
+    #if ENABLED(DOGLCD)
+      delay(1000);
+    #elif ENABLED(ULTRA_LCD)
+      bootscreen();
+      lcd_init();
+    #endif
   #endif
 
   analogWrite(LED_PIN, 255);
@@ -6489,6 +6497,16 @@ inline void gcode_M503() {
 
 #endif // DUAL_X_CARRIAGE
 
+#if ENABLED(LIN_ADVANCE)
+  /**
+   * M905: Set advance factor
+   */
+  inline void gcode_M905() {
+    stepper.synchronize();
+    stepper.advance_M905(code_seen('K') ? code_value_float() : -1.0);
+  }
+#endif
+
 /**
  * M907: Set digital trimpot motor current using axis codes X, Y, Z, E, B, S
  */
@@ -7361,6 +7379,12 @@ void process_next_command() {
           gcode_M605();
           break;
       #endif // DUAL_X_CARRIAGE
+      
+      #if ENABLED(LIN_ADVANCE)
+        case 905: // M905 Set advance factor.
+          gcode_M905();
+          break;
+      #endif
 
       case 907: // M907 Set digital trimpot motor current using axis codes.
         gcode_M907();
@@ -8297,6 +8321,7 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
 
 void kill(const char* lcd_msg) {
   #if ENABLED(ULTRA_LCD)
+    lcd_init();
     lcd_setalertstatuspgm(lcd_msg);
   #else
     UNUSED(lcd_msg);
