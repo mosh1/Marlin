@@ -574,7 +574,7 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = false; // set to true to invert the l
 
     #define LEFT_PROBE_BED_POSITION 10
     #define RIGHT_PROBE_BED_POSITION 250 // BigBox | 265 for Dual, 235 for Pro
-    #define FRONT_PROBE_BED_POSITION 15
+    #define FRONT_PROBE_BED_POSITION 35
     #define BACK_PROBE_BED_POSITION 185
 
     #define MIN_PROBE_EDGE 10 // The Z probe minimum square sides can be no smaller than this.
