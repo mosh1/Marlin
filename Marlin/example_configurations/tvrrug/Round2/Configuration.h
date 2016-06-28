@@ -499,12 +499,9 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
 //#define Z_MIN_PROBE_REPEATABILITY_TEST
 
 //
-// Probe Raise options provide clearance for the probe to deploy and stow.
+// Probe Raise options provide clearance for the probe to deploy, stow, and travel.
 //
-// For G28 these apply when the probe deploys and stows.
-// For G29 these apply before and after the full procedure.
-#define Z_RAISE_BEFORE_PROBING 15   // Raise before probe deploy (e.g., the first probe).
-#define Z_RAISE_AFTER_PROBING 15    // Raise before probe stow (e.g., the last probe).
+#define Z_RAISE_PROBE_DEPLOY_STOW 15 // Raise to make room for the probe to deploy / stow
 #define Z_RAISE_BETWEEN_PROBINGS 5  // Raise between probing points.
 
 //
@@ -1167,17 +1164,15 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
 //
 //#define NUM_SERVOS 3 // Servo index starts with 0 for M280 command
 
+// Delay (in microseconds) before the next move will start, to give the servo time to reach its target angle.
+// 300ms is a good value but you can try less delay.
+// If the servo can't reach the requested position, increase it.
+#define SERVO_DELAY 300
+
 // Servo deactivation
 //
 // With this option servos are powered only during movement, then turned off to prevent jitter.
 //#define DEACTIVATE_SERVOS_AFTER_MOVE
-
-#if ENABLED(DEACTIVATE_SERVOS_AFTER_MOVE)
-  // Delay (in microseconds) before turning the servo off. This depends on the servo speed.
-  // 300ms is a good value but you can try less delay.
-  // If the servo can't reach the requested position, increase it.
-  #define SERVO_DEACTIVATION_DELAY 300
-#endif
 
 /**********************************************************************\
  * Support for a filament diameter sensor

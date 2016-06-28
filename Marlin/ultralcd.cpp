@@ -1077,7 +1077,11 @@ static void lcd_led_toggle() {
       if (lcdDrawUpdate) lcd_implementation_drawedit(PSTR(MSG_LEVEL_BED_WAITING));
       if (LCD_CLICKED) {
         _lcd_level_bed_position = 0;
-        current_position[Z_AXIS] = MESH_HOME_SEARCH_Z;
+        current_position[Z_AXIS] = MESH_HOME_SEARCH_Z
+          #if Z_HOME_DIR > 0
+            + Z_MAX_POS
+          #endif
+        ;
         planner.set_position_mm(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);
         lcd_goto_screen(_lcd_level_goto_next_point, true);
       }
@@ -2027,9 +2031,8 @@ static void lcd_led_toggle() {
       lcd.buzz(LCD_FEEDBACK_FREQUENCY_DURATION_MS, LCD_FEEDBACK_FREQUENCY_HZ);
     #elif PIN_EXISTS(BEEPER)
       buzzer.tone(LCD_FEEDBACK_FREQUENCY_DURATION_MS, LCD_FEEDBACK_FREQUENCY_HZ);
-    #else
-      delay(LCD_FEEDBACK_FREQUENCY_DURATION_MS);
     #endif
+    delay(10); // needed for buttons to settle
   }
 
   /**
@@ -2291,14 +2294,11 @@ void lcd_update() {
 
                 #if ENABLED(ENCODER_RATE_MULTIPLIER_DEBUG)
                   SERIAL_ECHO_START;
-                  SERIAL_ECHO("Enc Step Rate: ");
-                  SERIAL_ECHO(encoderStepRate);
-                  SERIAL_ECHO("  Multiplier: ");
-                  SERIAL_ECHO(encoderMultiplier);
-                  SERIAL_ECHO("  ENCODER_10X_STEPS_PER_SEC: ");
-                  SERIAL_ECHO(ENCODER_10X_STEPS_PER_SEC);
-                  SERIAL_ECHO("  ENCODER_100X_STEPS_PER_SEC: ");
-                  SERIAL_ECHOLN(ENCODER_100X_STEPS_PER_SEC);
+                  SERIAL_ECHOPAIR("Enc Step Rate: ", encoderStepRate);
+                  SERIAL_ECHOPAIR("  Multiplier: ", encoderMultiplier);
+                  SERIAL_ECHOPAIR("  ENCODER_10X_STEPS_PER_SEC: ", ENCODER_10X_STEPS_PER_SEC);
+                  SERIAL_ECHOPAIR("  ENCODER_100X_STEPS_PER_SEC: ", ENCODER_100X_STEPS_PER_SEC);
+                  SERIAL_EOL;
                 #endif //ENCODER_RATE_MULTIPLIER_DEBUG
               }
 

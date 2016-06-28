@@ -117,8 +117,11 @@
 
 // The following define selects which electronics board you have.
 // Please choose the name from boards.h that matches your setup
+// for Rigidbot version 1 : #define MOTHERBOARD BOARD_RIGIDBOARD
+// for Rigidbot Version 2 : #define MOTHERBOARD BOARD_RIGIDBOARD_V2
+
 #ifndef MOTHERBOARD
-  #define MOTHERBOARD BOARD_RIGIDBOARD
+  #define MOTHERBOARD BOARD_RIGIDBOARD_V2
 #endif
 
 // Optional custom name for your RepStrap or other custom machine
@@ -503,12 +506,9 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = false; // set to true to invert the l
 //#define Z_MIN_PROBE_REPEATABILITY_TEST
 
 //
-// Probe Raise options provide clearance for the probe to deploy and stow.
+// Probe Raise options provide clearance for the probe to deploy, stow, and travel.
 //
-// For G28 these apply when the probe deploys and stows.
-// For G29 these apply before and after the full procedure.
-#define Z_RAISE_BEFORE_PROBING 15   // Raise before probe deploy (e.g., the first probe).
-#define Z_RAISE_AFTER_PROBING 15    // Raise before probe stow (e.g., the last probe).
+#define Z_RAISE_PROBE_DEPLOY_STOW 15 // Raise to make room for the probe to deploy / stow
 #define Z_RAISE_BETWEEN_PROBINGS 5  // Raise between probing points.
 
 //
@@ -1170,17 +1170,15 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = false; // set to true to invert the l
 //
 #define NUM_SERVOS 0 // DGlass3D - Servo index starts with 0 for M280 command
 
+// Delay (in microseconds) before the next move will start, to give the servo time to reach its target angle.
+// 300ms is a good value but you can try less delay.
+// If the servo can't reach the requested position, increase it.
+#define SERVO_DELAY 300
+
 // Servo deactivation
 //
 // With this option servos are powered only during movement, then turned off to prevent jitter.
 //#define DEACTIVATE_SERVOS_AFTER_MOVE
-
-#if ENABLED(DEACTIVATE_SERVOS_AFTER_MOVE)
-  // Delay (in microseconds) before turning the servo off. This depends on the servo speed.
-  // 300ms is a good value but you can try less delay.
-  // If the servo can't reach the requested position, increase it.
-  #define SERVO_DEACTIVATION_DELAY 300
-#endif
 
 /**********************************************************************\
  * Support for a filament diameter sensor
