@@ -1,4 +1,4 @@
-node {
+node('arduino') {
 	stage 'Checkout'
 	checkout scm
 
