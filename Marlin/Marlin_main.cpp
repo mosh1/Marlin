@@ -1826,7 +1826,7 @@ static void clean_up_after_endstop_or_probe_move() {
           destination[X_AXIS] = Z_PROBE_ALLEN_KEY_DEPLOY_1_X;
           destination[Y_AXIS] = Z_PROBE_ALLEN_KEY_DEPLOY_1_Y;
           destination[Z_AXIS] = Z_PROBE_ALLEN_KEY_DEPLOY_1_Z;
-          prepare_move_to_destination_raw(); // this will also set_current_to_destination
+          prepare_move_to_destination(); // this will also set_current_to_destination
 
           // Move to engage deployment
           if (Z_PROBE_ALLEN_KEY_DEPLOY_2_FEEDRATE != Z_PROBE_ALLEN_KEY_DEPLOY_1_FEEDRATE)
@@ -1837,7 +1837,7 @@ static void clean_up_after_endstop_or_probe_move() {
             destination[Y_AXIS] = Z_PROBE_ALLEN_KEY_DEPLOY_2_Y;
           if (Z_PROBE_ALLEN_KEY_DEPLOY_2_Z != Z_PROBE_ALLEN_KEY_DEPLOY_1_Z)
             destination[Z_AXIS] = Z_PROBE_ALLEN_KEY_DEPLOY_2_Z;
-          prepare_move_to_destination_raw();
+          prepare_move_to_destination();
 
           #ifdef Z_PROBE_ALLEN_KEY_DEPLOY_3_X
             if (Z_PROBE_ALLEN_KEY_DEPLOY_3_FEEDRATE != Z_PROBE_ALLEN_KEY_DEPLOY_2_FEEDRATE)
@@ -1853,14 +1853,14 @@ static void clean_up_after_endstop_or_probe_move() {
             if (Z_PROBE_ALLEN_KEY_DEPLOY_3_Z != Z_PROBE_ALLEN_KEY_DEPLOY_2_Z)
               destination[Z_AXIS] = Z_PROBE_ALLEN_KEY_DEPLOY_3_Z;
 
-            prepare_move_to_destination_raw();
+            prepare_move_to_destination();
           #endif
         }
 
       // Partially Home X,Y for safety
       destination[X_AXIS] *= 0.75;
       destination[Y_AXIS] *= 0.75;
-      prepare_move_to_destination_raw(); // this will also set_current_to_destination
+      prepare_move_to_destination(); // this will also set_current_to_destination
 
       feedrate = old_feedrate;
 
@@ -1926,7 +1926,7 @@ static void clean_up_after_endstop_or_probe_move() {
       destination[X_AXIS] = Z_PROBE_ALLEN_KEY_STOW_1_X;
       destination[Y_AXIS] = Z_PROBE_ALLEN_KEY_STOW_1_Y;
       destination[Z_AXIS] = Z_PROBE_ALLEN_KEY_STOW_1_Z;
-      prepare_move_to_destination_raw();
+      prepare_move_to_destination();
 
       // Move the nozzle down to push the Z probe into retracted position
       if (Z_PROBE_ALLEN_KEY_STOW_2_FEEDRATE != Z_PROBE_ALLEN_KEY_STOW_1_FEEDRATE)
@@ -1936,7 +1936,7 @@ static void clean_up_after_endstop_or_probe_move() {
       if (Z_PROBE_ALLEN_KEY_STOW_2_Y != Z_PROBE_ALLEN_KEY_STOW_1_Y)
         destination[Y_AXIS] = Z_PROBE_ALLEN_KEY_STOW_2_Y;
       destination[Z_AXIS] = Z_PROBE_ALLEN_KEY_STOW_2_Z;
-      prepare_move_to_destination_raw();
+      prepare_move_to_destination();
 
       // Move up for safety
       if (Z_PROBE_ALLEN_KEY_STOW_3_FEEDRATE != Z_PROBE_ALLEN_KEY_STOW_2_FEEDRATE)
@@ -1946,13 +1946,13 @@ static void clean_up_after_endstop_or_probe_move() {
       if (Z_PROBE_ALLEN_KEY_STOW_3_Y != Z_PROBE_ALLEN_KEY_STOW_2_Y)
         destination[Y_AXIS] = Z_PROBE_ALLEN_KEY_STOW_3_Y;
       destination[Z_AXIS] = Z_PROBE_ALLEN_KEY_STOW_3_Z;
-      prepare_move_to_destination_raw();
+      prepare_move_to_destination();
 
       // Home XY for safety
       feedrate = homing_feedrate[X_AXIS] / 2;
       destination[X_AXIS] = 0;
       destination[Y_AXIS] = 0;
-      prepare_move_to_destination_raw(); // this will also set_current_to_destination
+      prepare_move_to_destination(); // this will also set_current_to_destination
 
       feedrate = old_feedrate;
 
@@ -4564,7 +4564,7 @@ inline void gcode_M109() {
       else print_job_timer.start();
     #endif
 
-    if (temp > thermalManager.degHotend(target_extruder)) LCD_MESSAGEPGM(MSG_HEATING);
+    if (thermalManager.isHeatingHotend(target_extruder)) LCD_MESSAGEPGM(MSG_HEATING);
   }
 
   #if ENABLED(AUTOTEMP)
@@ -4580,10 +4580,10 @@ inline void gcode_M109() {
     #define TEMP_CONDITIONS (wants_to_cool ? thermalManager.isCoolingHotend(target_extruder) : thermalManager.isHeatingHotend(target_extruder))
   #endif //TEMP_RESIDENCY_TIME > 0
 
-  float theTarget = -1;
+  float theTarget = -1.0, old_temp = 9999.0;
   bool wants_to_cool;
   cancel_heatup = false;
-  millis_t now, next_temp_ms = 0;
+  millis_t now, next_temp_ms = 0, next_cool_check_ms = 0;
 
   KEEPALIVE_STATE(NOT_BUSY);
 
@@ -4595,10 +4595,6 @@ inline void gcode_M109() {
 
       // Exit if S<lower>, continue if S<higher>, R<lower>, or R<higher>
       if (no_wait_for_cooling && wants_to_cool) break;
-
-      // Prevent a wait-forever situation if R is misused i.e. M109 R0
-      // Try to calculate a ballpark safe margin by halving EXTRUDE_MINTEMP
-      if (wants_to_cool && theTarget < (EXTRUDE_MINTEMP)/2) break;
     }
 
     now = millis();
@@ -4622,9 +4618,11 @@ inline void gcode_M109() {
     idle();
     refresh_cmd_timeout(); // to prevent stepper_inactive_time from running out
 
+    float temp = thermalManager.degHotend(target_extruder);
+
     #if TEMP_RESIDENCY_TIME > 0
 
-      float temp_diff = fabs(theTarget - thermalManager.degHotend(target_extruder));
+      float temp_diff = fabs(theTarget - temp);
 
       if (!residency_start_ms) {
         // Start the TEMP_RESIDENCY_TIME timer when we reach target temp for the first time.
@@ -4636,6 +4634,17 @@ inline void gcode_M109() {
       }
 
     #endif //TEMP_RESIDENCY_TIME > 0
+
+    // Prevent a wait-forever situation if R is misused i.e. M109 R0
+    if (wants_to_cool) {
+      if (temp < (EXTRUDE_MINTEMP) / 2) break; // always break at (default) 85°
+      // break after 20 seconds if cooling stalls
+      if (!next_cool_check_ms || ELAPSED(now, next_cool_check_ms)) {
+        if (old_temp - temp < 1.0) break;
+        next_cool_check_ms = now + 20000;
+        old_temp = temp;
+      }
+    }
 
   } while (!cancel_heatup && TEMP_CONDITIONS);
 
@@ -4665,10 +4674,10 @@ inline void gcode_M109() {
       #define TEMP_BED_CONDITIONS (wants_to_cool ? thermalManager.isCoolingBed() : thermalManager.isHeatingBed())
     #endif //TEMP_BED_RESIDENCY_TIME > 0
 
-    float theTarget = -1;
+    float theTarget = -1.0, old_temp = 9999.0;
     bool wants_to_cool;
     cancel_heatup = false;
-    millis_t now, next_temp_ms = 0;
+    millis_t now, next_temp_ms = 0, next_cool_check_ms = 0;
 
     KEEPALIVE_STATE(NOT_BUSY);
 
@@ -4680,10 +4689,6 @@ inline void gcode_M109() {
 
         // Exit if S<lower>, continue if S<higher>, R<lower>, or R<higher>
         if (no_wait_for_cooling && wants_to_cool) break;
-
-        // Prevent a wait-forever situation if R is misused i.e. M190 R0
-        // Simply don't wait to cool a bed under 30C
-        if (wants_to_cool && theTarget < 30) break;
       }
 
       now = millis();
@@ -4707,9 +4712,11 @@ inline void gcode_M109() {
       idle();
       refresh_cmd_timeout(); // to prevent stepper_inactive_time from running out
 
+      float temp = thermalManager.degBed();
+
       #if TEMP_BED_RESIDENCY_TIME > 0
 
-        float temp_diff = fabs(theTarget - thermalManager.degBed());
+        float temp_diff = fabs(theTarget - temp);
 
         if (!residency_start_ms) {
           // Start the TEMP_BED_RESIDENCY_TIME timer when we reach target temp for the first time.
@@ -4722,7 +4729,19 @@ inline void gcode_M109() {
 
       #endif //TEMP_BED_RESIDENCY_TIME > 0
 
+      // Prevent a wait-forever situation if R is misused i.e. M190 R0
+      if (wants_to_cool) {
+        if (temp < 30.0) break; // always break at 30°
+        // break after 20 seconds if cooling stalls
+        if (!next_cool_check_ms || ELAPSED(now, next_cool_check_ms)) {
+          if (old_temp - temp < 1.0) break;
+          next_cool_check_ms = now + 20000;
+          old_temp = temp;
+        }
+      }
+
     } while (!cancel_heatup && TEMP_BED_CONDITIONS);
+
     LCD_MESSAGEPGM(MSG_BED_DONE);
     KEEPALIVE_STATE(IN_HANDLER);
   }
@@ -7551,7 +7570,7 @@ void mesh_buffer_line(float x, float y, float z, const float e, float feed_rate,
 
 #if ENABLED(DUAL_X_CARRIAGE)
 
-  inline bool prepare_move_dual_x_carriage() {
+  inline bool prepare_move_to_destination_dualx() {
     if (active_extruder_parked) {
       if (dual_x_carriage_mode == DXC_DUPLICATION_MODE && active_extruder == 0) {
         // move duplicate extruder into correct duplication position.
@@ -7590,7 +7609,7 @@ void mesh_buffer_line(float x, float y, float z, const float e, float feed_rate,
 
 #if DISABLED(DELTA) && DISABLED(SCARA)
 
-  inline bool prepare_cartesian_move_to_destination() {
+  inline bool prepare_move_to_destination_cartesian() {
     // Do not use feedrate_multiplier for E or Z only moves
     if (current_position[X_AXIS] == destination[X_AXIS] && current_position[Y_AXIS] == destination[Y_AXIS]) {
       line_to_destination();
@@ -7651,9 +7670,9 @@ void prepare_move_to_destination() {
     if (!prepare_delta_move_to(destination)) return;
   #else
     #if ENABLED(DUAL_X_CARRIAGE)
-      if (!prepare_move_dual_x_carriage()) return;
+      if (!prepare_move_to_destination_dualx()) return;
     #endif
-    if (!prepare_cartesian_move_to_destination()) return;
+    if (!prepare_move_to_destination_cartesian()) return;
   #endif
 
   set_current_to_destination();
