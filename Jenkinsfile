@@ -16,8 +16,7 @@ DISPLAY=:1.0'''
 	
 	stage 'Build'
 	sh '''export DISPLAY=:1.0
-/usr/local/bin/generate_version_header_for_marlin ./Marlin/_Version.h "BigBox Hybrid-Pro"
-cat ./Marlin/_Version.h
+/usr/local/bin/generate_version_header_for_marlin ./Marlin
 ./arduino-1.6.4/arduino --verify --board arduino:avr:mega:cpu=atmega2560 Marlin/Marlin.ino \\
 --pref build.path=./buildroot'''
 
