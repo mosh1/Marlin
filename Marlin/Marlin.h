@@ -278,6 +278,7 @@ extern float sw_endstop_min[3]; // axis[n].sw_endstop_min
 extern float sw_endstop_max[3]; // axis[n].sw_endstop_max
 extern bool axis_known_position[3]; // axis[n].is_known
 extern bool axis_homed[3]; // axis[n].is_homed
+extern float extruder_offset[][EXTRUDERS];
 
 #if ENABLED(DELTA)
   #ifndef DELTA_RADIUS_TRIM_TOWER_1

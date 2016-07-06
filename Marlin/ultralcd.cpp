@@ -1351,14 +1351,14 @@ static void lcd_move_menu() {
   MENU_ITEM(submenu, MSG_MOVE_1MM, lcd_move_menu_1mm);
   MENU_ITEM(submenu, MSG_MOVE_01MM, lcd_move_menu_01mm);
   //TODO:X,Y,Z,E
-  
+
   if (axis_homed[Z_AXIS]) {
 	  MENU_ITEM(gcode, "Move Z to 295", PSTR("G1 Z295 F3000"));
   }
   else {
       MENU_ITEM(gcode, "Move Z to 295", PSTR("G28\nG1 Z295 F3000"));
   }
-  
+
   END_MENU();
 }
 
@@ -1683,6 +1683,8 @@ static void lcd_control_motion_menu() {
   MENU_ITEM_EDIT(float5, MSG_A_TRAVEL, &travel_acceleration, 100, 99000);
   MENU_ITEM_EDIT(float52, MSG_XSTEPS, &axis_steps_per_unit[X_AXIS], 5, 9999);
   MENU_ITEM_EDIT(float52, MSG_YSTEPS, &axis_steps_per_unit[Y_AXIS], 5, 9999);
+  MENU_ITEM_EDIT(float52, "T1 X offset", &extruder_offset[X_AXIS][1], -999, 999);
+  MENU_ITEM_EDIT(float52, "T1 Y offset", &extruder_offset[Y_AXIS][1], -999, 999);
   #if ENABLED(DELTA)
     MENU_ITEM_EDIT(float52, MSG_ZSTEPS, &axis_steps_per_unit[Z_AXIS], 5, 9999);
   #else
