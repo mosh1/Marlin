@@ -138,7 +138,7 @@ uint8_t lcdDrawUpdate = LCDVIEW_CLEAR_CALL_REDRAW; // Set when the LCD needs to 
     static void lcd_filament_change_load_message();
     static void lcd_filament_change_extrude_message();
     static void lcd_filament_change_resume_message();
-  #endif 
+  #endif
 
   #if HAS_LCD_CONTRAST
     static void lcd_set_contrast();
@@ -1806,6 +1806,8 @@ static void lcd_led_toggle() {
     MENU_ITEM_EDIT(float5, MSG_A_TRAVEL, &planner.travel_acceleration, 100, 99000);
     MENU_ITEM_EDIT(float52, MSG_XSTEPS, &planner.axis_steps_per_mm[X_AXIS], 5, 9999);
     MENU_ITEM_EDIT(float52, MSG_YSTEPS, &planner.axis_steps_per_mm[Y_AXIS], 5, 9999);
+    MENU_ITEM_EDIT(float52, "T1 X offset", &extruder_offset[X_AXIS][1], -999, 999);
+    MENU_ITEM_EDIT(float52, "T1 Y offset", &extruder_offset[Y_AXIS][1], -999, 999);
     #if ENABLED(DELTA)
       MENU_ITEM_EDIT(float52, MSG_ZSTEPS, &planner.axis_steps_per_mm[Z_AXIS], 5, 9999);
     #else
@@ -2192,7 +2194,7 @@ static void lcd_led_toggle() {
       #endif
       END_SCREEN();
     }
-  
+
     void lcd_filament_change_show_message(FilamentChangeMessage message) {
       switch (message) {
         case FILAMENT_CHANGE_MESSAGE_INIT:
