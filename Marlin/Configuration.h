@@ -262,9 +262,9 @@
   //#define  DEFAULT_Kd 440
 
   // E3D v6 (PT100, 30W)
-  #define  DEFAULT_Kp 24.00
-  #define  DEFAULT_Ki 01.80
-  #define  DEFAULT_Kd 79.10
+  #define  DEFAULT_Kp 29.20
+  #define  DEFAULT_Ki 04.73
+  #define  DEFAULT_Kd 45.33
 
 #endif // PIDTEMP
 
@@ -309,9 +309,9 @@
   //#define  DEFAULT_bedKd 1675.16
 
   //E3D BigBox Variable Power Density Heated Bed (24V)
-  #define  DEFAULT_bedKp 170.70
-  #define  DEFAULT_bedKi 32.80
-  #define  DEFAULT_bedKd 222.50
+  #define  DEFAULT_bedKp 336
+  #define  DEFAULT_bedKi 61
+  #define  DEFAULT_bedKd 462.4
 
   // FIND YOUR OWN: "M303 E-1 C8 S90" to run autotune on the bed at 90 degreesC for 8 cycles.
 #endif // PIDTEMPBED
