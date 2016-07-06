@@ -485,8 +485,6 @@ static bool send_ok[BUFSIZE];
   #define KEEPALIVE_STATE(n) ;
 #endif // HOST_KEEPALIVE_FEATURE
 
-bool led_on = false;
-
 /**
  * ***************************************************************************
  * ******************************** FUNCTIONS ********************************
@@ -3915,15 +3913,6 @@ inline void gcode_M42() {
 
     int pin_number = code_seen('P') ? code_value_short() : LED_PIN;
     if (pin_number < 0) return;
-
-    if (pin_number == LED_PIN) {
-      if (pin_status == 0) {
-        led_on = false;
-      }
-      else {
-        led_on = true;
-      }
-    }
 
     for (uint8_t i = 0; i < COUNT(sensitive_pins); i++)
       if (pin_number == sensitive_pins[i]) return;
