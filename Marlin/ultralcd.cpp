@@ -1806,8 +1806,8 @@ static void lcd_led_toggle() {
     MENU_ITEM_EDIT(float5, MSG_A_TRAVEL, &planner.travel_acceleration, 100, 99000);
     MENU_ITEM_EDIT(float52, MSG_XSTEPS, &planner.axis_steps_per_mm[X_AXIS], 5, 9999);
     MENU_ITEM_EDIT(float52, MSG_YSTEPS, &planner.axis_steps_per_mm[Y_AXIS], 5, 9999);
-    MENU_ITEM_EDIT(float52, "T1 X offset", &extruder_offset[X_AXIS][1], -999, 999);
-    MENU_ITEM_EDIT(float52, "T1 Y offset", &extruder_offset[Y_AXIS][1], -999, 999);
+    MENU_ITEM_EDIT(float52, "T1 X offset", &hotend_offset[X_AXIS][1], -999, 999);
+    MENU_ITEM_EDIT(float52, "T1 Y offset", &hotend_offset[Y_AXIS][1], -999, 999);
     #if ENABLED(DELTA)
       MENU_ITEM_EDIT(float52, MSG_ZSTEPS, &planner.axis_steps_per_mm[Z_AXIS], 5, 9999);
     #else
