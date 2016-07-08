@@ -3,7 +3,7 @@ node('arduino') {
 	checkout scm
 
 	stage 'Load and prepare Ardunio'
-	sh '''wget http://downloads-02.arduino.cc/arduino-1.6.4-linux64.tar.xz
+	sh '''wget https://downloads.arduino.cc/arduino-1.6.4-linux64.tar.xz
 tar Jxf arduino-1.6.4-linux64.tar.xz'''
 
 	stage 'Prepare dummy Xserver'
