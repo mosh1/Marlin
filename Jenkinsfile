@@ -3,7 +3,7 @@ node('arduino') {
 	checkout scm
 
 	stage 'Load and prepare Ardunio'
-	sh '''wget https://downloads.arduino.cc/arduino-1.6.4-linux64.tar.xz
+	sh '''wget ftp://nas01.alitecs.local/Jenkins/arduino-1.6.4-linux64.tar.xz
 tar Jxf arduino-1.6.4-linux64.tar.xz'''
 
 	stage 'Prepare dummy Xserver'
@@ -13,7 +13,7 @@ DISPLAY=:1.0'''
 	stage 'Install additional Arduino libraries'
 	sh '''export DISPLAY=:1.0
 ./arduino-1.6.4/arduino --install-library "U8glib,LiquidCrystal"'''
-	
+
 	stage 'Build'
 	sh '''export DISPLAY=:1.0
 /usr/local/bin/generate_version_header_for_marlin ./Marlin
