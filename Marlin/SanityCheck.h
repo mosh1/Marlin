@@ -76,8 +76,14 @@
 /**
  * Dual Stepper Drivers
  */
-#if ENABLED(Z_DUAL_STEPPER_DRIVERS) && ENABLED(Y_DUAL_STEPPER_DRIVERS)
-  #error "You cannot have dual stepper drivers for both Y and Z."
+#if ENABLED(X_DUAL_STEPPER_DRIVERS) && ENABLED(DUAL_X_CARRIAGE)
+  #error "DUAL_X_CARRIAGE is not compatible with X_DUAL_STEPPER_DRIVERS."
+#elif ENABLED(X_DUAL_STEPPER_DRIVERS) && (!HAS_X2_ENABLE || !HAS_X2_STEP || !HAS_X2_DIR)
+  #error "X_DUAL_STEPPER_DRIVERS requires X2 pins (and an extra E plug)."
+#elif ENABLED(Y_DUAL_STEPPER_DRIVERS) && (!HAS_Y2_ENABLE || !HAS_Y2_STEP || !HAS_Y2_DIR)
+  #error "Y_DUAL_STEPPER_DRIVERS requires Y2 pins (and an extra E plug)."
+#elif ENABLED(Z_DUAL_STEPPER_DRIVERS) && (!HAS_Z2_ENABLE || !HAS_Z2_STEP || !HAS_Z2_DIR)
+  #error "Z_DUAL_STEPPER_DRIVERS requires Z2 pins (and an extra E plug)."
 #endif
 
 /**
@@ -111,13 +117,13 @@
 #endif
 
 /**
- * Filament Runout needs a pin and SD Support
+ * Filament Runout needs a pin and either SD Support or Auto print start detection
  */
 #if ENABLED(FILAMENT_RUNOUT_SENSOR)
   #if !HAS_FIL_RUNOUT
     #error "FILAMENT_RUNOUT_SENSOR requires FIL_RUNOUT_PIN."
-  #elif DISABLED(SDSUPPORT)
-    #error "FILAMENT_RUNOUT_SENSOR requires SDSUPPORT."
+  #elif DISABLED(SDSUPPORT) && DISABLED(PRINTJOB_TIMER_AUTOSTART)
+    #error "FILAMENT_RUNOUT_SENSOR requires SDSUPPORT or PRINTJOB_TIMER_AUTOSTART."
   #endif
 #endif
 
@@ -150,14 +156,6 @@
 
   #if ENABLED(HEATERS_PARALLEL)
     #error "EXTRUDERS must be 1 with HEATERS_PARALLEL."
-  #endif
-
-  #if ENABLED(Y_DUAL_STEPPER_DRIVERS)
-    #error "EXTRUDERS must be 1 with Y_DUAL_STEPPER_DRIVERS."
-  #endif
-
-  #if ENABLED(Z_DUAL_STEPPER_DRIVERS)
-    #error "EXTRUDERS must be 1 with Z_DUAL_STEPPER_DRIVERS."
   #endif
 
 #elif ENABLED(SINGLENOZZLE)

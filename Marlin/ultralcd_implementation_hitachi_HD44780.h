@@ -572,6 +572,19 @@ unsigned lcd_print(char c) { return charset_mapper(c); }
 
 #endif // SHOW_BOOTSCREEN
 
+void lcd_kill_screen() {
+  lcd.setCursor(0, 0);
+  lcd_print(lcd_status_message);
+  #if LCD_HEIGHT < 4
+    lcd.setCursor(0, 2);
+  #else
+    lcd.setCursor(0, 2);
+    lcd_printPGM(PSTR(MSG_HALTED));
+    lcd.setCursor(0, 3);
+  #endif
+  lcd_printPGM(PSTR(MSG_PLEASE_RESET));
+}
+
 FORCE_INLINE void _draw_axis_label(AxisEnum axis, const char *pstr, bool blink) {
   if (blink)
     lcd_printPGM(pstr);
@@ -817,7 +830,8 @@ static void lcd_implementation_status_screen() {
 
 #if ENABLED(LCD_INFO_MENU) || ENABLED(FILAMENT_CHANGE_FEATURE)
 
-  static void lcd_implementation_drawmenu_static(uint8_t row, const char* pstr, const char *valstr=NULL, bool center=true) {
+  static void lcd_implementation_drawmenu_static(uint8_t row, const char* pstr, bool center=true, bool invert=false, const char *valstr=NULL) {
+    UNUSED(invert);
     char c;
     int8_t n = LCD_WIDTH;
     lcd.setCursor(0, row);
@@ -825,13 +839,13 @@ static void lcd_implementation_status_screen() {
       int8_t pad = (LCD_WIDTH - lcd_strlen_P(pstr)) / 2;
       while (--pad >= 0) { lcd.print(' '); n--; }
     }
-    while ((c = pgm_read_byte(pstr)) && n > 0) {
+    while (n > 0 && (c = pgm_read_byte(pstr))) {
       n -= lcd_print(c);
       pstr++;
     }
-    if (valstr) {
-      lcd_print(valstr);
-      n -= lcd_strlen(valstr);
+    if (valstr) while (n > 0 && (c = *valstr)) {
+      n -= lcd_print(c);
+      valstr++;
     }
     while (n-- > 0) lcd.print(' ');
   }
