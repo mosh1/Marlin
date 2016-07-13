@@ -33,13 +33,8 @@
   #include "printcounter.h"
 #endif
 
-int plaPreheatHotendTemp;
-int plaPreheatHPBTemp;
-int plaPreheatFanSpeed;
-
-int absPreheatHotendTemp;
-int absPreheatHPBTemp;
-int absPreheatFanSpeed;
+int preheatHotendTemp1, preheatBedTemp1, preheatFanSpeed1,
+    preheatHotendTemp2, preheatBedTemp2, preheatFanSpeed2;
 
 #if ENABLED(FILAMENT_LCD_DISPLAY)
   millis_t previous_lcd_status_ms = 0;
@@ -400,11 +395,8 @@ uint8_t lcdDrawUpdate = LCDVIEW_CLEAR_CALL_REDRAW; // Set when the LCD needs to 
     if (currentScreen != screen) {
       currentScreen = screen;
       lcdDrawUpdate = LCDVIEW_CLEAR_CALL_REDRAW;
-      encoderTopLine = 0;
-      #if ENABLED(NEWPANEL)
-        encoderPosition = encoder;
-        if (feedback) lcd_quick_feedback();
-      #endif
+      encoderPosition = encoder;
+      if (feedback) lcd_quick_feedback();
       if (screen == lcd_status_screen) {
         defer_return_to_status = false;
         screen_history_depth = 0;
@@ -421,9 +413,7 @@ uint8_t lcdDrawUpdate = LCDVIEW_CLEAR_CALL_REDRAW; // Set when the LCD needs to 
   inline void lcd_save_previous_menu() {
     if (screen_history_depth < COUNT(screen_history)) {
       screen_history[screen_history_depth].menu_function = currentScreen;
-      #if ENABLED(ULTIPANEL)
-        screen_history[screen_history_depth].encoder_position = encoderPosition;
-      #endif
+      screen_history[screen_history_depth].encoder_position = encoderPosition;
       ++screen_history_depth;
     }
   }
@@ -431,10 +421,10 @@ uint8_t lcdDrawUpdate = LCDVIEW_CLEAR_CALL_REDRAW; // Set when the LCD needs to 
   static void lcd_goto_previous_menu(bool feedback=false) {
     if (screen_history_depth > 0) {
       --screen_history_depth;
-      lcd_goto_screen(screen_history[screen_history_depth].menu_function, feedback
-        #if ENABLED(ULTIPANEL)
-          , screen_history[screen_history_depth].encoder_position
-        #endif
+      lcd_goto_screen(
+        screen_history[screen_history_depth].menu_function,
+        feedback,
+        screen_history[screen_history_depth].encoder_position
       );
     }
     else
@@ -910,29 +900,29 @@ static void lcd_led_toggle() {
   }
 
   #if TEMP_SENSOR_0 != 0
-    void lcd_preheat_pla0() { _lcd_preheat(0, plaPreheatHotendTemp, plaPreheatHPBTemp, plaPreheatFanSpeed); }
-    void lcd_preheat_abs0() { _lcd_preheat(0, absPreheatHotendTemp, absPreheatHPBTemp, absPreheatFanSpeed); }
+    void lcd_preheat_pla0() { _lcd_preheat(0, preheatHotendTemp1, preheatBedTemp1, preheatFanSpeed1); }
+    void lcd_preheat_abs0() { _lcd_preheat(0, preheatHotendTemp2, preheatBedTemp2, preheatFanSpeed2); }
   #endif
 
   #if HOTENDS > 1
-    void lcd_preheat_pla1() { _lcd_preheat(1, plaPreheatHotendTemp, plaPreheatHPBTemp, plaPreheatFanSpeed); }
-    void lcd_preheat_abs1() { _lcd_preheat(1, absPreheatHotendTemp, absPreheatHPBTemp, absPreheatFanSpeed); }
+    void lcd_preheat_pla1() { _lcd_preheat(1, preheatHotendTemp1, preheatBedTemp1, preheatFanSpeed1); }
+    void lcd_preheat_abs1() { _lcd_preheat(1, preheatHotendTemp2, preheatBedTemp2, preheatFanSpeed2); }
     #if HOTENDS > 2
-      void lcd_preheat_pla2() { _lcd_preheat(2, plaPreheatHotendTemp, plaPreheatHPBTemp, plaPreheatFanSpeed); }
-      void lcd_preheat_abs2() { _lcd_preheat(2, absPreheatHotendTemp, absPreheatHPBTemp, absPreheatFanSpeed); }
+      void lcd_preheat_pla2() { _lcd_preheat(2, preheatHotendTemp1, preheatBedTemp1, preheatFanSpeed1); }
+      void lcd_preheat_abs2() { _lcd_preheat(2, preheatHotendTemp2, preheatBedTemp2, preheatFanSpeed2); }
       #if HOTENDS > 3
-        void lcd_preheat_pla3() { _lcd_preheat(3, plaPreheatHotendTemp, plaPreheatHPBTemp, plaPreheatFanSpeed); }
-        void lcd_preheat_abs3() { _lcd_preheat(3, absPreheatHotendTemp, absPreheatHPBTemp, absPreheatFanSpeed); }
+        void lcd_preheat_pla3() { _lcd_preheat(3, preheatHotendTemp1, preheatBedTemp1, preheatFanSpeed1); }
+        void lcd_preheat_abs3() { _lcd_preheat(3, preheatHotendTemp2, preheatBedTemp2, preheatFanSpeed2); }
       #endif
     #endif
 
     void lcd_preheat_pla0123() {
       #if HOTENDS > 1
-        thermalManager.setTargetHotend(plaPreheatHotendTemp, 1);
+        thermalManager.setTargetHotend(preheatHotendTemp1, 1);
         #if HOTENDS > 2
-          thermalManager.setTargetHotend(plaPreheatHotendTemp, 2);
+          thermalManager.setTargetHotend(preheatHotendTemp1, 2);
           #if HOTENDS > 3
-            thermalManager.setTargetHotend(plaPreheatHotendTemp, 3);
+            thermalManager.setTargetHotend(preheatHotendTemp1, 3);
           #endif
         #endif
       #endif
@@ -940,11 +930,11 @@ static void lcd_led_toggle() {
     }
     void lcd_preheat_abs0123() {
       #if HOTENDS > 1
-        thermalManager.setTargetHotend(absPreheatHotendTemp, 1);
+        thermalManager.setTargetHotend(preheatHotendTemp2, 1);
         #if HOTENDS > 2
-          thermalManager.setTargetHotend(absPreheatHotendTemp, 2);
+          thermalManager.setTargetHotend(preheatHotendTemp2, 2);
           #if HOTENDS > 3
-            thermalManager.setTargetHotend(absPreheatHotendTemp, 3);
+            thermalManager.setTargetHotend(preheatHotendTemp2, 3);
           #endif
         #endif
       #endif
@@ -954,8 +944,8 @@ static void lcd_led_toggle() {
   #endif // HOTENDS > 1
 
   #if TEMP_SENSOR_BED != 0
-    void lcd_preheat_pla_bedonly() { _lcd_preheat(0, 0, plaPreheatHPBTemp, plaPreheatFanSpeed); }
-    void lcd_preheat_abs_bedonly() { _lcd_preheat(0, 0, absPreheatHPBTemp, absPreheatFanSpeed); }
+    void lcd_preheat_pla_bedonly() { _lcd_preheat(0, 0, preheatBedTemp1, preheatFanSpeed1); }
+    void lcd_preheat_abs_bedonly() { _lcd_preheat(0, 0, preheatBedTemp2, preheatFanSpeed2); }
   #endif
 
   #if TEMP_SENSOR_0 != 0 && (TEMP_SENSOR_1 != 0 || TEMP_SENSOR_2 != 0 || TEMP_SENSOR_3 != 0 || TEMP_SENSOR_BED != 0)
@@ -964,20 +954,20 @@ static void lcd_led_toggle() {
       START_MENU();
       MENU_ITEM(back, MSG_PREPARE);
       #if HOTENDS == 1
-        MENU_ITEM(function, MSG_PREHEAT_PLA, lcd_preheat_pla0);
+        MENU_ITEM(function, MSG_PREHEAT_1, lcd_preheat_pla0);
       #else
-        MENU_ITEM(function, MSG_PREHEAT_PLA_N MSG_H1, lcd_preheat_pla0);
-        MENU_ITEM(function, MSG_PREHEAT_PLA_N MSG_H2, lcd_preheat_pla1);
+        MENU_ITEM(function, MSG_PREHEAT_1_N MSG_H1, lcd_preheat_pla0);
+        MENU_ITEM(function, MSG_PREHEAT_1_N MSG_H2, lcd_preheat_pla1);
         #if HOTENDS > 2
-          MENU_ITEM(function, MSG_PREHEAT_PLA_N MSG_H3, lcd_preheat_pla2);
+          MENU_ITEM(function, MSG_PREHEAT_1_N MSG_H3, lcd_preheat_pla2);
           #if HOTENDS > 3
-            MENU_ITEM(function, MSG_PREHEAT_PLA_N MSG_H4, lcd_preheat_pla3);
+            MENU_ITEM(function, MSG_PREHEAT_1_N MSG_H4, lcd_preheat_pla3);
           #endif
         #endif
-        MENU_ITEM(function, MSG_PREHEAT_PLA_ALL, lcd_preheat_pla0123);
+        MENU_ITEM(function, MSG_PREHEAT_1_ALL, lcd_preheat_pla0123);
       #endif
       #if TEMP_SENSOR_BED != 0
-        MENU_ITEM(function, MSG_PREHEAT_PLA_BEDONLY, lcd_preheat_pla_bedonly);
+        MENU_ITEM(function, MSG_PREHEAT_1_BEDONLY, lcd_preheat_pla_bedonly);
       #endif
       END_MENU();
     }
@@ -986,20 +976,20 @@ static void lcd_led_toggle() {
       START_MENU();
       MENU_ITEM(back, MSG_PREPARE);
       #if HOTENDS == 1
-        MENU_ITEM(function, MSG_PREHEAT_ABS, lcd_preheat_abs0);
+        MENU_ITEM(function, MSG_PREHEAT_2, lcd_preheat_abs0);
       #else
-        MENU_ITEM(function, MSG_PREHEAT_ABS_N MSG_H1, lcd_preheat_abs0);
-        MENU_ITEM(function, MSG_PREHEAT_ABS_N MSG_H2, lcd_preheat_abs1);
+        MENU_ITEM(function, MSG_PREHEAT_2_N MSG_H1, lcd_preheat_abs0);
+        MENU_ITEM(function, MSG_PREHEAT_2_N MSG_H2, lcd_preheat_abs1);
         #if HOTENDS > 2
-          MENU_ITEM(function, MSG_PREHEAT_ABS_N MSG_H3, lcd_preheat_abs2);
+          MENU_ITEM(function, MSG_PREHEAT_2_N MSG_H3, lcd_preheat_abs2);
           #if HOTENDS > 3
-            MENU_ITEM(function, MSG_PREHEAT_ABS_N MSG_H4, lcd_preheat_abs3);
+            MENU_ITEM(function, MSG_PREHEAT_2_N MSG_H4, lcd_preheat_abs3);
           #endif
         #endif
-        MENU_ITEM(function, MSG_PREHEAT_ABS_ALL, lcd_preheat_abs0123);
+        MENU_ITEM(function, MSG_PREHEAT_2_ALL, lcd_preheat_abs0123);
       #endif
       #if TEMP_SENSOR_BED != 0
-        MENU_ITEM(function, MSG_PREHEAT_ABS_BEDONLY, lcd_preheat_abs_bedonly);
+        MENU_ITEM(function, MSG_PREHEAT_2_BEDONLY, lcd_preheat_abs_bedonly);
       #endif
       END_MENU();
     }
@@ -1275,11 +1265,11 @@ static void lcd_led_toggle() {
     //
     #if TEMP_SENSOR_0 != 0
       #if TEMP_SENSOR_1 != 0 || TEMP_SENSOR_2 != 0 || TEMP_SENSOR_3 != 0 || TEMP_SENSOR_BED != 0
-        MENU_ITEM(submenu, MSG_PREHEAT_PLA, lcd_preheat_pla_menu);
-        MENU_ITEM(submenu, MSG_PREHEAT_ABS, lcd_preheat_abs_menu);
+        MENU_ITEM(submenu, MSG_PREHEAT_1, lcd_preheat_pla_menu);
+        MENU_ITEM(submenu, MSG_PREHEAT_2, lcd_preheat_abs_menu);
       #else
-        MENU_ITEM(function, MSG_PREHEAT_PLA, lcd_preheat_pla0);
-        MENU_ITEM(function, MSG_PREHEAT_ABS, lcd_preheat_abs0);
+        MENU_ITEM(function, MSG_PREHEAT_1, lcd_preheat_pla0);
+        MENU_ITEM(function, MSG_PREHEAT_2, lcd_preheat_abs0);
       #endif
     #endif
 
@@ -1323,12 +1313,14 @@ static void lcd_led_toggle() {
 
   #endif // DELTA_CALIBRATION_MENU
 
+  float move_menu_scale;
+
   /**
    * If the most recent manual move hasn't been fed to the planner yet,
    * and the planner can accept one, send immediately
    */
   inline void manage_manual_move() {
-    if (manual_move_axis != (int8_t)NO_AXIS && millis() >= manual_move_start_time && !planner.is_full()) {
+    if (manual_move_axis != (int8_t)NO_AXIS && ELAPSED(millis(), manual_move_start_time) && !planner.is_full()) {
       #if ENABLED(DELTA)
         calculate_delta(current_position);
         planner.buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], current_position[E_AXIS], manual_feedrate[manual_move_axis]/60, manual_move_e_index);
@@ -1351,7 +1343,7 @@ static void lcd_led_toggle() {
     #if EXTRUDERS > 1
       if (axis == E_AXIS) manual_move_e_index = eindex >= 0 ? eindex : active_extruder;
     #endif
-    manual_move_start_time = millis() + 500UL; // 1/2 second delay
+    manual_move_start_time = millis() + (move_menu_scale < 0.99 ? 0UL : 250UL); // delay for bigger moves
     manual_move_axis = (int8_t)axis;
   }
 
@@ -1360,8 +1352,6 @@ static void lcd_led_toggle() {
    * "Prepare" > "Move Axis" submenu
    *
    */
-
-  float move_menu_scale;
 
   static void _lcd_move_xyz(const char* name, AxisEnum axis, float min, float max) {
     if (LCD_CLICKED) { lcd_goto_previous_menu(true); return; }
@@ -1746,12 +1736,12 @@ static void lcd_led_toggle() {
     //
     // Preheat PLA conf
     //
-    MENU_ITEM(submenu, MSG_PREHEAT_PLA_SETTINGS, lcd_control_temperature_preheat_pla_settings_menu);
+    MENU_ITEM(submenu, MSG_PREHEAT_1_SETTINGS, lcd_control_temperature_preheat_pla_settings_menu);
 
     //
     // Preheat ABS conf
     //
-    MENU_ITEM(submenu, MSG_PREHEAT_ABS_SETTINGS, lcd_control_temperature_preheat_abs_settings_menu);
+    MENU_ITEM(submenu, MSG_PREHEAT_2_SETTINGS, lcd_control_temperature_preheat_abs_settings_menu);
     END_MENU();
   }
 
@@ -1763,12 +1753,12 @@ static void lcd_led_toggle() {
   static void lcd_control_temperature_preheat_pla_settings_menu() {
     START_MENU();
     MENU_ITEM(back, MSG_TEMPERATURE);
-    MENU_ITEM_EDIT(int3, MSG_FAN_SPEED, &plaPreheatFanSpeed, 0, 255);
+    MENU_ITEM_EDIT(int3, MSG_FAN_SPEED, &preheatFanSpeed1, 0, 255);
     #if TEMP_SENSOR_0 != 0
-      MENU_ITEM_EDIT(int3, MSG_NOZZLE, &plaPreheatHotendTemp, HEATER_0_MINTEMP, HEATER_0_MAXTEMP - 15);
+      MENU_ITEM_EDIT(int3, MSG_NOZZLE, &preheatHotendTemp1, HEATER_0_MINTEMP, HEATER_0_MAXTEMP - 15);
     #endif
     #if TEMP_SENSOR_BED != 0
-      MENU_ITEM_EDIT(int3, MSG_BED, &plaPreheatHPBTemp, BED_MINTEMP, BED_MAXTEMP - 15);
+      MENU_ITEM_EDIT(int3, MSG_BED, &preheatBedTemp1, BED_MINTEMP, BED_MAXTEMP - 15);
     #endif
     #if ENABLED(EEPROM_SETTINGS)
       MENU_ITEM(function, MSG_STORE_EPROM, Config_StoreSettings);
@@ -1784,12 +1774,12 @@ static void lcd_led_toggle() {
   static void lcd_control_temperature_preheat_abs_settings_menu() {
     START_MENU();
     MENU_ITEM(back, MSG_TEMPERATURE);
-    MENU_ITEM_EDIT(int3, MSG_FAN_SPEED, &absPreheatFanSpeed, 0, 255);
+    MENU_ITEM_EDIT(int3, MSG_FAN_SPEED, &preheatFanSpeed2, 0, 255);
     #if TEMP_SENSOR_0 != 0
-      MENU_ITEM_EDIT(int3, MSG_NOZZLE, &absPreheatHotendTemp, HEATER_0_MINTEMP, HEATER_0_MAXTEMP - 15);
+      MENU_ITEM_EDIT(int3, MSG_NOZZLE, &preheatHotendTemp2, HEATER_0_MINTEMP, HEATER_0_MAXTEMP - 15);
     #endif
     #if TEMP_SENSOR_BED != 0
-      MENU_ITEM_EDIT(int3, MSG_BED, &absPreheatHPBTemp, BED_MINTEMP, BED_MAXTEMP - 15);
+      MENU_ITEM_EDIT(int3, MSG_BED, &preheatBedTemp2, BED_MINTEMP, BED_MAXTEMP - 15);
     #endif
     #if ENABLED(EEPROM_SETTINGS)
       MENU_ITEM(function, MSG_STORE_EPROM, Config_StoreSettings);
@@ -2474,7 +2464,7 @@ void lcd_init() {
       SET_INPUT(BTN_RT);
     #endif
 
-  #else  // Not NEWPANEL
+  #else // !NEWPANEL
 
     #if ENABLED(SR_LCD_2W_NL) // Non latching 2 wire shift register
       pinMode(SR_DATA_PIN, OUTPUT);
@@ -2489,7 +2479,7 @@ void lcd_init() {
       WRITE(SHIFT_EN, LOW);
     #endif // SR_LCD_2W_NL
 
-  #endif//!NEWPANEL
+  #endif // !NEWPANEL
 
   #if ENABLED(SDSUPPORT) && PIN_EXISTS(SD_DETECT)
     SET_INPUT(SD_DETECT_PIN);
@@ -2511,7 +2501,11 @@ void lcd_init() {
 int lcd_strlen(const char* s) {
   int i = 0, j = 0;
   while (s[i]) {
-    if ((s[i] & 0xc0) != 0x80) j++;
+    #ifdef MAPPER_NON
+      j++;
+    #else
+      if ((s[i] & 0xc0) != 0x80) j++;
+    #endif
     i++;
   }
   return j;
@@ -2520,7 +2514,11 @@ int lcd_strlen(const char* s) {
 int lcd_strlen_P(const char* s) {
   int j = 0;
   while (pgm_read_byte(s)) {
-    if ((pgm_read_byte(s) & 0xc0) != 0x80) j++;
+    #ifdef MAPPER_NON
+      j++; 
+    #else
+      if ((pgm_read_byte(s) & 0xc0) != 0x80) j++;
+    #endif
     s++;
   }
   return j;
@@ -2905,6 +2903,7 @@ void lcd_reset_alert_level() { lcd_status_message_level = 0; }
       GET_BUTTON_STATES(buttons);
     #endif //!NEWPANEL
 
+    // Manage encoder rotation
     #if ENABLED(REVERSE_MENU_DIRECTION) && ENABLED(REVERSE_ENCODER_DIRECTION)
       #define ENCODER_DIFF_CW  (encoderDiff -= encoderDirection)
       #define ENCODER_DIFF_CCW (encoderDiff += encoderDirection)
@@ -2920,7 +2919,6 @@ void lcd_reset_alert_level() { lcd_status_message_level = 0; }
     #endif
     #define ENCODER_SPIN(_E1, _E2) switch (lastEncoderBits) { case _E1: ENCODER_DIFF_CW; break; case _E2: ENCODER_DIFF_CCW; }
 
-    //manage encoder rotation
     uint8_t enc = 0;
     if (buttons & EN_A) enc |= B01;
     if (buttons & EN_B) enc |= B10;
