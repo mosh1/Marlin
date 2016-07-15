@@ -55,16 +55,16 @@
 #define MSG_SET_HOME_OFFSETS                "Ορισμός βασικών μετατοπίσεων" //SHORTEN
 #define MSG_HOME_OFFSETS_APPLIED            "Εφαρμόστηκαν οι μετατοπίσεις" //SHORTEN
 #define MSG_SET_ORIGIN                      "Ορισμός προέλευσης"
-#define MSG_PREHEAT_PLA                     "Προθέρμανση PLA"
-#define MSG_PREHEAT_PLA_N                   MSG_PREHEAT_PLA " "
-#define MSG_PREHEAT_PLA_ALL                 MSG_PREHEAT_PLA " όλα"
-#define MSG_PREHEAT_PLA_BEDONLY             MSG_PREHEAT_PLA " bed" //SHORTEN
-#define MSG_PREHEAT_PLA_SETTINGS            MSG_PREHEAT_PLA " επιβεβαίωση" //SHORTEN
-#define MSG_PREHEAT_ABS                     "Προθέρμανση ABS"
-#define MSG_PREHEAT_ABS_N                   MSG_PREHEAT_ABS " "
-#define MSG_PREHEAT_ABS_ALL                 MSG_PREHEAT_ABS " όλα"
-#define MSG_PREHEAT_ABS_BEDONLY             MSG_PREHEAT_ABS " bed" //SHORTEN
-#define MSG_PREHEAT_ABS_SETTINGS            MSG_PREHEAT_ABS " επιβεβαίωση" //SHORTEN
+#define MSG_PREHEAT_1                       "Προθέρμανση PLA"
+#define MSG_PREHEAT_1_N                     MSG_PREHEAT_1 " "
+#define MSG_PREHEAT_1_ALL                   MSG_PREHEAT_1 " όλα"
+#define MSG_PREHEAT_1_BEDONLY               MSG_PREHEAT_1 " bed" //SHORTEN
+#define MSG_PREHEAT_1_SETTINGS              MSG_PREHEAT_1 " επιβεβαίωση" //SHORTEN
+#define MSG_PREHEAT_2                       "Προθέρμανση ABS"
+#define MSG_PREHEAT_2_N                     MSG_PREHEAT_2 " "
+#define MSG_PREHEAT_2_ALL                   MSG_PREHEAT_2 " όλα"
+#define MSG_PREHEAT_2_BEDONLY               MSG_PREHEAT_2 " bed" //SHORTEN
+#define MSG_PREHEAT_2_SETTINGS              MSG_PREHEAT_2 " επιβεβαίωση" //SHORTEN
 #define MSG_H1                              "1"
 #define MSG_H2                              "2"
 #define MSG_H3                              "3"
@@ -198,6 +198,7 @@
 #define MSG_DELTA_CALIBRATE_Y               "Βαθμονόμηση Y"
 #define MSG_DELTA_CALIBRATE_Z               "Βαθμονόμηση Z"
 #define MSG_DELTA_CALIBRATE_CENTER          "Βαθμονόμηση κέντρου"
+
 #define MSG_INFO_MENU                       "About Printer"
 #define MSG_INFO_PRINTER_MENU               "Printer Info"
 #define MSG_INFO_STATS_MENU                 "Printer Stats"
@@ -206,42 +207,50 @@
 #define MSG_INFO_EXTRUDERS                  "Extruders"
 #define MSG_INFO_BAUDRATE                   "Baud"
 #define MSG_INFO_PROTOCOL                   "Protocol"
-#define MSG_INFO_TOTAL_PRINTS               "Total Prints"
-#define MSG_INFO_FINISHED_PRINTS            "Finished Prints"
-#define MSG_INFO_PRINT_TIME                 "Total Print Time"
+
+#if LCD_WIDTH > 19
+  #define MSG_INFO_PRINT_COUNT              "Print Count"
+  #define MSG_INFO_COMPLETED_PRINTS         "Completed  "
+  #define MSG_INFO_PRINT_TIME               "Total Time "
+#else
+  #define MSG_INFO_PRINT_COUNT              "Prints   "
+  #define MSG_INFO_COMPLETED_PRINTS         "Completed"
+  #define MSG_INFO_PRINT_TIME               "Duration "
+#endif
 #define MSG_INFO_MIN_TEMP                   "Min Temp"
 #define MSG_INFO_MAX_TEMP                   "Max Temp"
 #define MSG_INFO_PSU                        "Power Supply"
+
 #define MSG_FILAMENT_CHANGE_HEADER          "CHANGE FILAMENT"
 #define MSG_FILAMENT_CHANGE_OPTION_EXTRUDE  "Extrude more"
 #define MSG_FILAMENT_CHANGE_OPTION_RESUME   "Resume print"
 
 #if LCD_HEIGHT >= 4
-  #define MSG_FILAMENT_CHANGE_INIT_1          "Wait for start"
-  #define MSG_FILAMENT_CHANGE_INIT_2          "of the filament"
-  #define MSG_FILAMENT_CHANGE_INIT_3          "change"
-  #define MSG_FILAMENT_CHANGE_UNLOAD_1        "Wait for"
-  #define MSG_FILAMENT_CHANGE_UNLOAD_2        "filament unload"
-  #define MSG_FILAMENT_CHANGE_UNLOAD_3        ""
-  #define MSG_FILAMENT_CHANGE_INSERT_1        "Insert filament"
-  #define MSG_FILAMENT_CHANGE_INSERT_2        "and press button"
-  #define MSG_FILAMENT_CHANGE_INSERT_3        "to continue..."
-  #define MSG_FILAMENT_CHANGE_LOAD_1          "Wait for"
-  #define MSG_FILAMENT_CHANGE_LOAD_2          "filament load"
-  #define MSG_FILAMENT_CHANGE_LOAD_3          ""
-  #define MSG_FILAMENT_CHANGE_EXTRUDE_1       "Wait for"
-  #define MSG_FILAMENT_CHANGE_EXTRUDE_2       "filament extrude"
-  #define MSG_FILAMENT_CHANGE_EXTRUDE_3       ""
-  #define MSG_FILAMENT_CHANGE_RESUME_1        "Wait for print"
-  #define MSG_FILAMENT_CHANGE_RESUME_2        "to resume"
-  #define MSG_FILAMENT_CHANGE_RESUME_3        ""
+  #define MSG_FILAMENT_CHANGE_INIT_1        "Wait for start"
+  #define MSG_FILAMENT_CHANGE_INIT_2        "of the filament"
+  #define MSG_FILAMENT_CHANGE_INIT_3        "change"
+  #define MSG_FILAMENT_CHANGE_UNLOAD_1      "Wait for"
+  #define MSG_FILAMENT_CHANGE_UNLOAD_2      "filament unload"
+  #define MSG_FILAMENT_CHANGE_UNLOAD_3      ""
+  #define MSG_FILAMENT_CHANGE_INSERT_1      "Insert filament"
+  #define MSG_FILAMENT_CHANGE_INSERT_2      "and press button"
+  #define MSG_FILAMENT_CHANGE_INSERT_3      "to continue..."
+  #define MSG_FILAMENT_CHANGE_LOAD_1        "Wait for"
+  #define MSG_FILAMENT_CHANGE_LOAD_2        "filament load"
+  #define MSG_FILAMENT_CHANGE_LOAD_3        ""
+  #define MSG_FILAMENT_CHANGE_EXTRUDE_1     "Wait for"
+  #define MSG_FILAMENT_CHANGE_EXTRUDE_2     "filament extrude"
+  #define MSG_FILAMENT_CHANGE_EXTRUDE_3     ""
+  #define MSG_FILAMENT_CHANGE_RESUME_1      "Wait for print"
+  #define MSG_FILAMENT_CHANGE_RESUME_2      "to resume"
+  #define MSG_FILAMENT_CHANGE_RESUME_3      ""
 #else // LCD_HEIGHT < 4
-  #define MSG_FILAMENT_CHANGE_INIT_1          "Please wait..."
-  #define MSG_FILAMENT_CHANGE_UNLOAD_1        "Ejecting..."
-  #define MSG_FILAMENT_CHANGE_INSERT_1        "Insert and Click"
-  #define MSG_FILAMENT_CHANGE_LOAD_1          "Loading..."
-  #define MSG_FILAMENT_CHANGE_EXTRUDE_1       "Extruding..."
-  #define MSG_FILAMENT_CHANGE_RESUME_1        "Resuming..."
+  #define MSG_FILAMENT_CHANGE_INIT_1        "Please wait..."
+  #define MSG_FILAMENT_CHANGE_UNLOAD_1      "Ejecting..."
+  #define MSG_FILAMENT_CHANGE_INSERT_1      "Insert and Click"
+  #define MSG_FILAMENT_CHANGE_LOAD_1        "Loading..."
+  #define MSG_FILAMENT_CHANGE_EXTRUDE_1     "Extruding..."
+  #define MSG_FILAMENT_CHANGE_RESUME_1      "Resuming..."
 #endif
 
 #endif // LANGUAGE_EL_H
