@@ -301,7 +301,7 @@ uint8_t lcdDrawUpdate = LCDVIEW_CLEAR_CALL_REDRAW; // Set when the LCD needs to 
    *             Scroll as-needed to keep the selected line in view.
    *
    * At this point _thisItemNr equals the total number of items.
-   * 
+   *
    */
 
   // Simple-scroll by using encoderLine as encoderTopLine
@@ -1455,8 +1455,6 @@ static void lcd_led_toggle() {
     }
 
     if (move_menu_scale < 10.0) {
-      if (_MOVE_XYZ_ALLOWED) MENU_ITEM(submenu, MSG_MOVE_Z, lcd_move_z);
-
       #if ENABLED(SWITCHING_EXTRUDER)
         if (active_extruder)
           MENU_ITEM(gcode, MSG_SELECT MSG_E1, PSTR("T0"));
@@ -2538,7 +2536,7 @@ int lcd_strlen_P(const char* s) {
   int j = 0;
   while (pgm_read_byte(s)) {
     #ifdef MAPPER_NON
-      j++; 
+      j++;
     #else
       if ((pgm_read_byte(s) & 0xc0) != 0x80) j++;
     #endif
