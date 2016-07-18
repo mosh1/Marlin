@@ -573,7 +573,7 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = false; // set to true to invert the l
   #if ENABLED(AUTO_BED_LEVELING_GRID)
 
     #define LEFT_PROBE_BED_POSITION 10
-    #define RIGHT_PROBE_BED_POSITION 265
+    #define RIGHT_PROBE_BED_POSITION 235
     #define FRONT_PROBE_BED_POSITION 15
     #define BACK_PROBE_BED_POSITION 185
 
