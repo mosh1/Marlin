@@ -857,11 +857,11 @@
 //    P2: The nozzle height will be raised by Z-park amount but never going over
 //        the machine's limit of Z_MAX_POS.
 //
-//#define NOZZLE_PARK_FEATURE
+#define NOZZLE_PARK_FEATURE
 
 #if ENABLED(NOZZLE_PARK_FEATURE)
   // Specify a park position as { X, Y, Z }
-  #define NOZZLE_PARK_POINT { (X_MIN_POS + 10), (Y_MAX_POS - 10), 20 }
+  #define NOZZLE_PARK_POINT { 70, 240, 5 }
 #endif
 
 //
@@ -902,11 +902,11 @@
 
 #if ENABLED(NOZZLE_CLEAN_FEATURE)
   // Number of pattern repetitions
-  #define NOZZLE_CLEAN_STROKES  12
+  #define NOZZLE_CLEAN_STROKES  3
 
   //                            {  X,  Y,               Z}
-  #define NOZZLE_CLEAN_START_PT { 30, 30, (Z_MIN_POS + 5)}
-  #define NOZZLE_CLEAN_END_PT   {100, 60, (Z_MIN_POS + 5)}
+  #define NOZZLE_CLEAN_START_PT {70, 240, (Z_MIN_POS + 5)}
+  #define NOZZLE_CLEAN_END_PT   {80, 205, (Z_MIN_POS + 5)}
 
   // Moves the nozzle to the parked position
   #define NOZZLE_CLEAN_PARK
@@ -939,7 +939,7 @@
 //  - Total time printing
 //
 // This information can be viewed by the M78 command.
-//#define PRINTCOUNTER
+#define PRINTCOUNTER
 
 //=============================================================================
 //============================= LCD and SD support ============================
