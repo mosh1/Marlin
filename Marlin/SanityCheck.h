@@ -353,9 +353,22 @@
     #error "AUTO_BED_LEVELING_FEATURE requires a probe! Define a Z Servo, Z_PROBE_ALLEN_KEY, Z_PROBE_SLED, or FIX_MOUNTED_PROBE."
   #elif ENABLED(Z_MIN_PROBE_REPEATABILITY_TEST)
     #error "Z_MIN_PROBE_REPEATABILITY_TEST requires a probe! Define a Z Servo, Z_PROBE_ALLEN_KEY, Z_PROBE_SLED, or FIX_MOUNTED_PROBE."
+  #elif ENABLED(Z_SAFE_HOMING)
+    #error "Z_SAFE_HOMING currently requires a probe."
   #endif
 
 #endif
+
+/**
+ * Make sure Z_SAFE_HOMING point is reachable
+ */
+#if ENABLED(Z_SAFE_HOMING)
+  #if Z_SAFE_HOMING_X_POINT < MIN_PROBE_X || Z_SAFE_HOMING_X_POINT > MAX_PROBE_X
+    #error "The given Z_SAFE_HOMING_X_POINT can't be reached by the Z probe."
+  #elif Z_SAFE_HOMING_Y_POINT < MIN_PROBE_Y || Z_SAFE_HOMING_Y_POINT > MAX_PROBE_Y
+    #error "The given Z_SAFE_HOMING_Y_POINT can't be reached by the Z probe."
+  #endif
+#endif // Z_SAFE_HOMING
 
 /**
  * Auto Bed Leveling
@@ -564,8 +577,20 @@
       #elif !PIN_EXISTS(TEMP_3)
         #error "TEMP_3_PIN not defined for this board."
       #endif
+    #elif TEMP_SENSOR_3 != 0
+      #error "TEMP_SENSOR_3 shouldn't be set with only 3 extruders."
     #endif
+  #elif TEMP_SENSOR_2 != 0
+    #error "TEMP_SENSOR_2 shouldn't be set with only 2 extruders."
+  #elif TEMP_SENSOR_3 != 0
+    #error "TEMP_SENSOR_3 shouldn't be set with only 2 extruders."
   #endif
+#elif TEMP_SENSOR_1 != 0 && DISABLED(TEMP_SENSOR_1_AS_REDUNDANT)
+  #error "TEMP_SENSOR_1 shouldn't be set with only 1 extruder."
+#elif TEMP_SENSOR_2 != 0
+  #error "TEMP_SENSOR_2 shouldn't be set with only 1 extruder."
+#elif TEMP_SENSOR_3 != 0
+  #error "TEMP_SENSOR_3 shouldn't be set with only 1 extruder."
 #endif
 
 #if ENABLED(TEMP_SENSOR_1_AS_REDUNDANT) && TEMP_SENSOR_1 == 0

@@ -60,7 +60,7 @@
 #include "pins_arduino.h"
 #include "math.h"
 #include "nozzle.h"
-#include "timestamp_t.h"
+#include "duration_t.h"
 
 #if ENABLED(USE_WATCHDOG)
   #include "watchdog.h"
@@ -330,10 +330,6 @@ float position_shift[3] = { 0 };
 // This offset is added to the configured home position.
 // Set by M206, M428, or menu item. Saved to EEPROM.
 float home_offset[3] = { 0 };
-
-#define LOGICAL_POSITION(POS, AXIS) (POS + home_offset[AXIS] + position_shift[AXIS])
-#define RAW_POSITION(POS, AXIS) (POS - home_offset[AXIS] - position_shift[AXIS])
-#define RAW_CURRENT_POSITION(AXIS) (RAW_POSITION(current_position[AXIS], AXIS))
 
 // Software Endstops. Default to configured limits.
 float sw_endstop_min[3] = { X_MIN_POS, Y_MIN_POS, Z_MIN_POS };
@@ -611,6 +607,20 @@ static void report_current_position();
   #define DEBUG_POS(SUFFIX,VAR) do { \
     print_xyz(PSTR(STRINGIFY(VAR) "="), PSTR(" : " SUFFIX "\n"), VAR); } while(0)
 #endif
+
+/**
+ * sync_plan_position
+ * Set planner / stepper positions to the cartesian current_position.
+ * The stepper code translates these coordinates into step units.
+ * Allows translation between steps and millimeters for cartesian & core robots
+ */
+inline void sync_plan_position() {
+  #if ENABLED(DEBUG_LEVELING_FEATURE)
+    if (DEBUGGING(LEVELING)) DEBUG_POS("sync_plan_position", current_position);
+  #endif
+  planner.set_position_mm(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);
+}
+inline void sync_plan_position_e() { planner.set_e_position_mm(current_position[E_AXIS]); }
 
 #if ENABLED(DELTA) || ENABLED(SCARA)
   inline void sync_plan_position_delta() {
@@ -899,16 +909,15 @@ void setup() {
   // Send "ok" after commands by default
   for (int8_t i = 0; i < BUFSIZE; i++) send_ok[i] = true;
 
-  // loads data from EEPROM if available else uses defaults (and resets step acceleration rate)
+  // Load data from EEPROM if available (or use defaults)
+  // This also updates variables in the planner, elsewhere
   Config_RetrieveSettings();
 
   // Initialize current position based on home_offset
   memcpy(current_position, home_offset, sizeof(home_offset));
 
-  #if ENABLED(DELTA) || ENABLED(SCARA)
-    // Vital to init kinematic equivalent for X0 Y0 Z0
-    SYNC_PLAN_POSITION_KINEMATIC();
-  #endif
+  // Vital to init stepper/planner equivalent for current_position
+  SYNC_PLAN_POSITION_KINEMATIC();
 
   thermalManager.init();    // Initialize temperature loop
 
@@ -1324,7 +1333,7 @@ inline bool code_value_bool() { return code_value_byte() > 0; }
       case TEMPUNIT_C:
         return code_value_float();
       case TEMPUNIT_F:
-        return (code_value_float() - 32) / 1.8;
+        return (code_value_float() - 32) * 0.5555555556;
       case TEMPUNIT_K:
         return code_value_float() - 272.15;
       default:
@@ -1338,7 +1347,7 @@ inline bool code_value_bool() { return code_value_byte() > 0; }
       case TEMPUNIT_K:
         return code_value_float();
       case TEMPUNIT_F:
-        return code_value_float() / 1.8;
+        return code_value_float() * 0.5555555556;
       default:
         return code_value_float();
     }
@@ -1413,7 +1422,7 @@ XYZ_CONSTS_FROM_CONFIG(signed char, home_dir, HOME_DIR);
 
   static float x_home_pos(int extruder) {
     if (extruder == 0)
-      return LOGICAL_POSITION(base_home_pos(X_AXIS), X_AXIS);
+      return LOGICAL_X_POSITION(base_home_pos(X_AXIS));
     else
       /**
        * In dual carriage mode the extruder offset provides an override of the
@@ -1429,11 +1438,11 @@ XYZ_CONSTS_FROM_CONFIG(signed char, home_dir, HOME_DIR);
   }
 
   static float inactive_extruder_x_pos = X2_MAX_POS; // used in mode 0 & 1
-  static bool active_extruder_parked = false; // used in mode 1 & 2
-  static float raised_parked_position[NUM_AXIS]; // used in mode 1
-  static millis_t delayed_move_time = 0; // used in mode 1
+  static bool active_extruder_parked = false;        // used in mode 1 & 2
+  static float raised_parked_position[NUM_AXIS];     // used in mode 1
+  static millis_t delayed_move_time = 0;             // used in mode 1
   static float duplicate_extruder_x_offset = DEFAULT_DUPLICATION_X_OFFSET; // used in mode 2
-  static float duplicate_extruder_temp_offset = 0; // used in mode 2
+  static float duplicate_extruder_temp_offset = 0;   // used in mode 2
 
 #endif //DUAL_X_CARRIAGE
 
@@ -1518,7 +1527,7 @@ static void set_axis_is_at_home(AxisEnum axis) {
       if (active_extruder != 0)
         current_position[X_AXIS] = x_home_pos(active_extruder);
       else
-        current_position[X_AXIS] = LOGICAL_POSITION(base_home_pos(X_AXIS), X_AXIS);
+        current_position[X_AXIS] = LOGICAL_X_POSITION(base_home_pos(X_AXIS));
       update_software_endstops(X_AXIS);
       return;
     }
@@ -1632,19 +1641,6 @@ inline void line_to_destination(float fr_mm_m) {
 }
 inline void line_to_destination() { line_to_destination(feedrate_mm_m); }
 
-/**
- * sync_plan_position
- * Set planner / stepper positions to the cartesian current_position.
- * The stepper code translates these coordinates into step units.
- * Allows translation between steps and millimeters for cartesian & core robots
- */
-inline void sync_plan_position() {
-  #if ENABLED(DEBUG_LEVELING_FEATURE)
-    if (DEBUGGING(LEVELING)) DEBUG_POS("sync_plan_position", current_position);
-  #endif
-  planner.set_position_mm(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);
-}
-inline void sync_plan_position_e() { planner.set_e_position_mm(current_position[E_AXIS]); }
 inline void set_current_to_destination() { memcpy(current_position, destination, sizeof(current_position)); }
 inline void set_destination_to_current() { memcpy(destination, current_position, sizeof(destination)); }
 
@@ -1808,7 +1804,7 @@ static void clean_up_after_endstop_or_probe_move() {
         SERIAL_ECHOLNPGM(")");
       }
     #endif
-    float z_dest = LOGICAL_POSITION(z_raise, Z_AXIS);
+    float z_dest = LOGICAL_Z_POSITION(z_raise);
 
     if (zprobe_zoffset < 0)
       z_dest -= zprobe_zoffset;
@@ -2969,7 +2965,7 @@ inline void gcode_G28() {
 
       if (home_all_axis || homeX || homeY) {
         // Raise Z before homing any other axes and z is not already high enough (never lower z)
-        destination[Z_AXIS] = LOGICAL_POSITION(MIN_Z_HEIGHT_FOR_HOMING, Z_AXIS);
+        destination[Z_AXIS] = LOGICAL_Z_POSITION(MIN_Z_HEIGHT_FOR_HOMING);
         if (destination[Z_AXIS] > current_position[Z_AXIS]) {
 
           #if ENABLED(DEBUG_LEVELING_FEATURE)
@@ -3009,7 +3005,7 @@ inline void gcode_G28() {
         int tmp_extruder = active_extruder;
         active_extruder = !active_extruder;
         HOMEAXIS(X);
-        inactive_extruder_x_pos = current_position[X_AXIS];
+        inactive_extruder_x_pos = RAW_X_POSITION(current_position[X_AXIS]);
         active_extruder = tmp_extruder;
         HOMEAXIS(X);
         // reset state used by the different modes
@@ -3084,7 +3080,7 @@ inline void gcode_G28() {
            * NOTE: This doesn't necessarily ensure the Z probe is also
            * within the bed!
            */
-          float cpx = current_position[X_AXIS], cpy = current_position[Y_AXIS];
+          float cpx = RAW_CURRENT_POSITION(X_AXIS), cpy = RAW_CURRENT_POSITION(Y_AXIS);
           if (   cpx >= X_MIN_POS - (X_PROBE_OFFSET_FROM_EXTRUDER)
               && cpx <= X_MAX_POS - (X_PROBE_OFFSET_FROM_EXTRUDER)
               && cpy >= Y_MIN_POS - (Y_PROBE_OFFSET_FROM_EXTRUDER)
@@ -3223,12 +3219,12 @@ inline void gcode_G28() {
     ;
     line_to_current_position();
 
-    current_position[X_AXIS] = LOGICAL_POSITION(x, X_AXIS);
-    current_position[Y_AXIS] = LOGICAL_POSITION(y, Y_AXIS);
+    current_position[X_AXIS] = LOGICAL_X_POSITION(x);
+    current_position[Y_AXIS] = LOGICAL_Y_POSITION(y);
     line_to_current_position();
 
     #if Z_RAISE_BETWEEN_PROBINGS > 0 || MIN_Z_HEIGHT_FOR_HOMING > 0
-      current_position[Z_AXIS] = LOGICAL_POSITION(MESH_HOME_SEARCH_Z, Z_AXIS);
+      current_position[Z_AXIS] = LOGICAL_Z_POSITION(MESH_HOME_SEARCH_Z);
       line_to_current_position();
     #endif
 
@@ -3481,36 +3477,36 @@ inline void gcode_G28() {
 
       xy_probe_feedrate_mm_m = code_seen('S') ? (int)code_value_linear_units() : XY_PROBE_SPEED;
 
-      int left_probe_bed_position = code_seen('L') ? (int)code_value_axis_units(X_AXIS) : LEFT_PROBE_BED_POSITION,
-          right_probe_bed_position = code_seen('R') ? (int)code_value_axis_units(X_AXIS) : RIGHT_PROBE_BED_POSITION,
-          front_probe_bed_position = code_seen('F') ? (int)code_value_axis_units(Y_AXIS) : FRONT_PROBE_BED_POSITION,
-          back_probe_bed_position = code_seen('B') ? (int)code_value_axis_units(Y_AXIS) : BACK_PROBE_BED_POSITION;
+      int left_probe_bed_position = code_seen('L') ? (int)code_value_axis_units(X_AXIS) : LOGICAL_X_POSITION(LEFT_PROBE_BED_POSITION),
+          right_probe_bed_position = code_seen('R') ? (int)code_value_axis_units(X_AXIS) : LOGICAL_X_POSITION(RIGHT_PROBE_BED_POSITION),
+          front_probe_bed_position = code_seen('F') ? (int)code_value_axis_units(Y_AXIS) : LOGICAL_Y_POSITION(FRONT_PROBE_BED_POSITION),
+          back_probe_bed_position = code_seen('B') ? (int)code_value_axis_units(Y_AXIS) : LOGICAL_Y_POSITION(BACK_PROBE_BED_POSITION);
 
-      bool left_out_l = left_probe_bed_position < MIN_PROBE_X,
+      bool left_out_l = left_probe_bed_position < LOGICAL_X_POSITION(MIN_PROBE_X),
            left_out = left_out_l || left_probe_bed_position > right_probe_bed_position - (MIN_PROBE_EDGE),
-           right_out_r = right_probe_bed_position > MAX_PROBE_X,
+           right_out_r = right_probe_bed_position > LOGICAL_X_POSITION(MAX_PROBE_X),
            right_out = right_out_r || right_probe_bed_position < left_probe_bed_position + MIN_PROBE_EDGE,
-           front_out_f = front_probe_bed_position < MIN_PROBE_Y,
+           front_out_f = front_probe_bed_position < LOGICAL_Y_POSITION(MIN_PROBE_Y),
            front_out = front_out_f || front_probe_bed_position > back_probe_bed_position - (MIN_PROBE_EDGE),
-           back_out_b = back_probe_bed_position > MAX_PROBE_Y,
+           back_out_b = back_probe_bed_position > LOGICAL_Y_POSITION(MAX_PROBE_Y),
            back_out = back_out_b || back_probe_bed_position < front_probe_bed_position + MIN_PROBE_EDGE;
 
       if (left_out || right_out || front_out || back_out) {
         if (left_out) {
           out_of_range_error(PSTR("(L)eft"));
-          left_probe_bed_position = left_out_l ? MIN_PROBE_X : right_probe_bed_position - (MIN_PROBE_EDGE);
+          left_probe_bed_position = left_out_l ? LOGICAL_X_POSITION(MIN_PROBE_X) : right_probe_bed_position - (MIN_PROBE_EDGE);
         }
         if (right_out) {
           out_of_range_error(PSTR("(R)ight"));
-          right_probe_bed_position = right_out_r ? MAX_PROBE_X : left_probe_bed_position + MIN_PROBE_EDGE;
+          right_probe_bed_position = right_out_r ? LOGICAL_Y_POSITION(MAX_PROBE_X) : left_probe_bed_position + MIN_PROBE_EDGE;
         }
         if (front_out) {
           out_of_range_error(PSTR("(F)ront"));
-          front_probe_bed_position = front_out_f ? MIN_PROBE_Y : back_probe_bed_position - (MIN_PROBE_EDGE);
+          front_probe_bed_position = front_out_f ? LOGICAL_Y_POSITION(MIN_PROBE_Y) : back_probe_bed_position - (MIN_PROBE_EDGE);
         }
         if (back_out) {
           out_of_range_error(PSTR("(B)ack"));
-          back_probe_bed_position = back_out_b ? MAX_PROBE_Y : front_probe_bed_position + MIN_PROBE_EDGE;
+          back_probe_bed_position = back_out_b ? LOGICAL_Y_POSITION(MAX_PROBE_Y) : front_probe_bed_position + MIN_PROBE_EDGE;
         }
         return;
       }
@@ -3646,14 +3642,14 @@ inline void gcode_G28() {
       #endif
 
       // Probe at 3 arbitrary points
-      float z_at_pt_1 = probe_pt( LOGICAL_POSITION(ABL_PROBE_PT_1_X, X_AXIS),
-                                  LOGICAL_POSITION(ABL_PROBE_PT_1_Y, Y_AXIS),
+      float z_at_pt_1 = probe_pt( LOGICAL_X_POSITION(ABL_PROBE_PT_1_X, X_AXIS),
+                                  LOGICAL_Y_POSITION(ABL_PROBE_PT_1_Y, Y_AXIS),
                                   stow_probe_after_each, verbose_level),
-            z_at_pt_2 = probe_pt( LOGICAL_POSITION(ABL_PROBE_PT_2_X, X_AXIS),
-                                  LOGICAL_POSITION(ABL_PROBE_PT_2_Y, Y_AXIS),
+            z_at_pt_2 = probe_pt( LOGICAL_X_POSITION(ABL_PROBE_PT_2_X, X_AXIS),
+                                  LOGICAL_Y_POSITION(ABL_PROBE_PT_2_Y, Y_AXIS),
                                   stow_probe_after_each, verbose_level),
-            z_at_pt_3 = probe_pt( LOGICAL_POSITION(ABL_PROBE_PT_3_X, X_AXIS),
-                                  LOGICAL_POSITION(ABL_PROBE_PT_3_Y, Y_AXIS),
+            z_at_pt_3 = probe_pt( LOGICAL_X_POSITION(ABL_PROBE_PT_3_X, X_AXIS),
+                                  LOGICAL_Y_POSITION(ABL_PROBE_PT_3_Y, Y_AXIS),
                                   stow_probe_after_each, verbose_level);
 
       if (!dryrun) set_bed_level_equation_3pts(z_at_pt_1, z_at_pt_2, z_at_pt_3);
@@ -4063,13 +4059,13 @@ inline void gcode_M17() {
  */
 inline void gcode_M31() {
   char buffer[21];
-  timestamp_t time(print_job_timer.duration());
-  time.toString(buffer);
+  duration_t elapsed = print_job_timer.duration();
+  elapsed.toString(buffer);
 
   lcd_setstatus(buffer);
 
   SERIAL_ECHO_START;
-  SERIAL_ECHOPGM(MSG_PRINT_TIME " ");
+  SERIAL_ECHOPGM("Print time: ");
   SERIAL_ECHOLN(buffer);
 
   thermalManager.autotempShutdown();
@@ -4226,7 +4222,7 @@ inline void gcode_M42() {
 
     float X_probe_location = code_seen('X') ? code_value_axis_units(X_AXIS) : X_current + X_PROBE_OFFSET_FROM_EXTRUDER;
     #if DISABLED(DELTA)
-      if (X_probe_location < MIN_PROBE_X || X_probe_location > MAX_PROBE_X) {
+      if (X_probe_location < LOGICAL_X_POSITION(MIN_PROBE_X) || X_probe_location > LOGICAL_X_POSITION(MAX_PROBE_X)) {
         out_of_range_error(PSTR("X"));
         return;
       }
@@ -4234,12 +4230,12 @@ inline void gcode_M42() {
 
     float Y_probe_location = code_seen('Y') ? code_value_axis_units(Y_AXIS) : Y_current + Y_PROBE_OFFSET_FROM_EXTRUDER;
     #if DISABLED(DELTA)
-      if (Y_probe_location < MIN_PROBE_Y || Y_probe_location > MAX_PROBE_Y) {
+      if (Y_probe_location < LOGICAL_Y_POSITION(MIN_PROBE_Y) || Y_probe_location > LOGICAL_Y_POSITION(MAX_PROBE_Y)) {
         out_of_range_error(PSTR("Y"));
         return;
       }
     #else
-      if (HYPOT(X_probe_location, Y_probe_location) > DELTA_PROBEABLE_RADIUS) {
+      if (HYPOT(RAW_X_POSITION(X_probe_location), RAW_Y_POSITION(Y_probe_location)) > DELTA_PROBEABLE_RADIUS) {
         SERIAL_PROTOCOLLNPGM("? (X,Y) location outside of probeable radius.");
         return;
       }
@@ -5161,6 +5157,7 @@ inline void gcode_M92() {
       }
     }
   }
+  planner.refresh_positioning();
 }
 
 /**
@@ -6154,7 +6151,7 @@ inline void gcode_M428() {
   bool err = false;
   LOOP_XYZ(i) {
     if (axis_homed[i]) {
-      float base = (current_position[i] > (sw_endstop_min[i] + sw_endstop_max[i]) / 2) ? base_home_pos(i) : 0,
+      float base = (current_position[i] > (sw_endstop_min[i] + sw_endstop_max[i]) * 0.5) ? base_home_pos(i) : 0,
             diff = current_position[i] - LOGICAL_POSITION(base, i);
       if (diff > -20 && diff < 20) {
         set_home_offset((AxisEnum)i, home_offset[i] - diff);
@@ -6764,16 +6761,16 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_m/*=0.0*/, bool n
 
           switch (dual_x_carriage_mode) {
             case DXC_FULL_CONTROL_MODE:
-              current_position[X_AXIS] = inactive_extruder_x_pos;
-              inactive_extruder_x_pos = destination[X_AXIS];
+              current_position[X_AXIS] = LOGICAL_X_POSITION(inactive_extruder_x_pos);
+              inactive_extruder_x_pos = RAW_X_POSITION(destination[X_AXIS]);
               break;
             case DXC_DUPLICATION_MODE:
               active_extruder_parked = (active_extruder == 0); // this triggers the second extruder to move into the duplication position
               if (active_extruder_parked)
-                current_position[X_AXIS] = inactive_extruder_x_pos;
+                current_position[X_AXIS] = LOGICAL_X_POSITION(inactive_extruder_x_pos);
               else
                 current_position[X_AXIS] = destination[X_AXIS] + duplicate_extruder_x_offset;
-              inactive_extruder_x_pos = destination[X_AXIS];
+              inactive_extruder_x_pos = RAW_X_POSITION(destination[X_AXIS]);
               extruder_duplication_enabled = false;
               break;
             default:
@@ -7762,9 +7759,9 @@ void clamp_to_software_endstops(float target[3]) {
   void inverse_kinematics(const float in_cartesian[3]) {
 
     const float cartesian[3] = {
-      RAW_POSITION(in_cartesian[X_AXIS], X_AXIS),
-      RAW_POSITION(in_cartesian[Y_AXIS], Y_AXIS),
-      RAW_POSITION(in_cartesian[Z_AXIS], Z_AXIS)
+      RAW_X_POSITION(in_cartesian[X_AXIS]),
+      RAW_Y_POSITION(in_cartesian[Y_AXIS]),
+      RAW_Z_POSITION(in_cartesian[Z_AXIS])
     };
 
     delta[TOWER_1] = sqrt(delta_diagonal_rod_2_tower_1
@@ -7792,13 +7789,13 @@ void clamp_to_software_endstops(float target[3]) {
 
   float delta_safe_distance_from_top() {
     float cartesian[3] = {
-      LOGICAL_POSITION(0, X_AXIS),
-      LOGICAL_POSITION(0, Y_AXIS),
-      LOGICAL_POSITION(0, Z_AXIS)
+      LOGICAL_X_POSITION(0),
+      LOGICAL_Y_POSITION(0),
+      LOGICAL_Z_POSITION(0)
     };
     inverse_kinematics(cartesian);
     float distance = delta[TOWER_3];
-    cartesian[Y_AXIS] = LOGICAL_POSITION(DELTA_PRINTABLE_RADIUS, Y_AXIS);
+    cartesian[Y_AXIS] = LOGICAL_Y_POSITION(DELTA_PRINTABLE_RADIUS);
     inverse_kinematics(cartesian);
     return abs(distance - delta[TOWER_3]);
   }
@@ -7890,8 +7887,8 @@ void clamp_to_software_endstops(float target[3]) {
 
       int half = (AUTO_BED_LEVELING_GRID_POINTS - 1) / 2;
       float h1 = 0.001 - half, h2 = half - 0.001,
-            grid_x = max(h1, min(h2, RAW_POSITION(cartesian[X_AXIS], X_AXIS) / delta_grid_spacing[0])),
-            grid_y = max(h1, min(h2, RAW_POSITION(cartesian[Y_AXIS], Y_AXIS) / delta_grid_spacing[1]));
+            grid_x = max(h1, min(h2, RAW_X_POSITION(cartesian[X_AXIS]) / delta_grid_spacing[0])),
+            grid_y = max(h1, min(h2, RAW_Y_POSITION(cartesian[Y_AXIS]) / delta_grid_spacing[1]));
       int floor_x = floor(grid_x), floor_y = floor(grid_y);
       float ratio_x = grid_x - floor_x, ratio_y = grid_y - floor_y,
             z1 = bed_level[floor_x + half][floor_y + half],
@@ -7932,9 +7929,9 @@ void set_current_from_steppers_for_axis(AxisEnum axis) {
     current_position[axis] = LOGICAL_POSITION(cartesian_position[axis], axis);
   #elif ENABLED(AUTO_BED_LEVELING_FEATURE)
     vector_3 pos = planner.adjusted_position();
-    current_position[axis] = LOGICAL_POSITION(axis == X_AXIS ? pos.x : axis == Y_AXIS ? pos.y : pos.z, axis);
+    current_position[axis] = axis == X_AXIS ? pos.x : axis == Y_AXIS ? pos.y : pos.z;
   #else
-    current_position[axis] = LOGICAL_POSITION(stepper.get_axis_position_mm(axis), axis); // CORE handled transparently
+    current_position[axis] = stepper.get_axis_position_mm(axis); // CORE handled transparently
   #endif
 }
 
@@ -7944,8 +7941,8 @@ void set_current_from_steppers_for_axis(AxisEnum axis) {
 void mesh_line_to_destination(float fr_mm_m, uint8_t x_splits = 0xff, uint8_t y_splits = 0xff) {
   int cx1 = mbl.cell_index_x(RAW_CURRENT_POSITION(X_AXIS)),
       cy1 = mbl.cell_index_y(RAW_CURRENT_POSITION(Y_AXIS)),
-      cx2 = mbl.cell_index_x(RAW_POSITION(destination[X_AXIS], X_AXIS)),
-      cy2 = mbl.cell_index_y(RAW_POSITION(destination[Y_AXIS], Y_AXIS));
+      cx2 = mbl.cell_index_x(RAW_X_POSITION(destination[X_AXIS])),
+      cy2 = mbl.cell_index_y(RAW_Y_POSITION(destination[Y_AXIS]));
   NOMORE(cx1, MESH_NUM_X_POINTS - 2);
   NOMORE(cy1, MESH_NUM_Y_POINTS - 2);
   NOMORE(cx2, MESH_NUM_X_POINTS - 2);
@@ -7966,14 +7963,14 @@ void mesh_line_to_destination(float fr_mm_m, uint8_t x_splits = 0xff, uint8_t y_
   int8_t gcx = max(cx1, cx2), gcy = max(cy1, cy2);
   if (cx2 != cx1 && TEST(x_splits, gcx)) {
     memcpy(end, destination, sizeof(end));
-    destination[X_AXIS] = LOGICAL_POSITION(mbl.get_probe_x(gcx), X_AXIS);
+    destination[X_AXIS] = LOGICAL_X_POSITION(mbl.get_probe_x(gcx));
     normalized_dist = (destination[X_AXIS] - current_position[X_AXIS]) / (end[X_AXIS] - current_position[X_AXIS]);
     destination[Y_AXIS] = MBL_SEGMENT_END(Y);
     CBI(x_splits, gcx);
   }
   else if (cy2 != cy1 && TEST(y_splits, gcy)) {
     memcpy(end, destination, sizeof(end));
-    destination[Y_AXIS] = LOGICAL_POSITION(mbl.get_probe_y(gcy), Y_AXIS);
+    destination[Y_AXIS] = LOGICAL_Y_POSITION(mbl.get_probe_y(gcy));
     normalized_dist = (destination[Y_AXIS] - current_position[Y_AXIS]) / (end[Y_AXIS] - current_position[Y_AXIS]);
     destination[X_AXIS] = MBL_SEGMENT_END(X);
     CBI(y_splits, gcy);
@@ -8044,7 +8041,12 @@ void mesh_line_to_destination(float fr_mm_m, uint8_t x_splits = 0xff, uint8_t y_
     if (active_extruder_parked) {
       if (dual_x_carriage_mode == DXC_DUPLICATION_MODE && active_extruder == 0) {
         // move duplicate extruder into correct duplication position.
-        planner.set_position_mm(inactive_extruder_x_pos, current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS]);
+        planner.set_position_mm(
+          LOGICAL_X_POSITION(inactive_extruder_x_pos),
+          current_position[Y_AXIS],
+          current_position[Z_AXIS],
+          current_position[E_AXIS]
+        );
         planner.buffer_line(current_position[X_AXIS] + duplicate_extruder_x_offset,
                          current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS], planner.max_feedrate_mm_s[X_AXIS], 1);
         SYNC_PLAN_POSITION_KINEMATIC();
@@ -8388,8 +8390,8 @@ void prepare_move_to_destination() {
     float SCARA_pos[2];
     static float SCARA_C2, SCARA_S2, SCARA_K1, SCARA_K2, SCARA_theta, SCARA_psi;
 
-    SCARA_pos[X_AXIS] = RAW_POSITION(cartesian[X_AXIS], X_AXIS) * axis_scaling[X_AXIS] - SCARA_offset_x;  //Translate SCARA to standard X Y
-    SCARA_pos[Y_AXIS] = RAW_POSITION(cartesian[Y_AXIS], Y_AXIS) * axis_scaling[Y_AXIS] - SCARA_offset_y;  // With scaling factor.
+    SCARA_pos[X_AXIS] = RAW_X_POSITION(cartesian[X_AXIS]) * axis_scaling[X_AXIS] - SCARA_offset_x;  //Translate SCARA to standard X Y
+    SCARA_pos[Y_AXIS] = RAW_Y_POSITION(cartesian[Y_AXIS]) * axis_scaling[Y_AXIS] - SCARA_offset_y;  // With scaling factor.
 
     #if (Linkage_1 == Linkage_2)
       SCARA_C2 = ((sq(SCARA_pos[X_AXIS]) + sq(SCARA_pos[Y_AXIS])) / (2 * (float)L1_2)) - 1;
@@ -8407,7 +8409,7 @@ void prepare_move_to_destination() {
 
     delta[X_AXIS] = SCARA_theta * SCARA_RAD2DEG;  // Multiply by 180/Pi  -  theta is support arm angle
     delta[Y_AXIS] = (SCARA_theta + SCARA_psi) * SCARA_RAD2DEG;  //       -  equal to sub arm angle (inverted motor)
-    delta[Z_AXIS] = RAW_POSITION(cartesian[Z_AXIS], Z_AXIS);
+    delta[Z_AXIS] = RAW_Z_POSITION(cartesian[Z_AXIS]);
 
     /**
     SERIAL_ECHOPGM("cartesian x="); SERIAL_ECHO(cartesian[X_AXIS]);

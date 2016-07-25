@@ -58,7 +58,7 @@
 #include "ultralcd_st7920_u8glib_rrd.h"
 #include "Configuration.h"
 
-#include "timestamp_t.h"
+#include "duration_t.h"
 
 #if DISABLED(MAPPER_C2C3) && DISABLED(MAPPER_NON) && ENABLED(USE_BIG_EDIT_FONT)
   #undef USE_BIG_EDIT_FONT
@@ -141,7 +141,9 @@
 #define START_COL              0
 
 // LCD selection
-#if ENABLED(U8GLIB_ST7920)
+#if ENABLED(REPRAPWORLD_GRAPHICAL_LCD)
+  U8GLIB_ST7920_128X64_4X u8g(LCD_PINS_RS);
+#elif ENABLED(U8GLIB_ST7920)
   //U8GLIB_ST7920_128X64_RRD u8g(0,0,0);
   U8GLIB_ST7920_128X64_RRD u8g(0);
 #elif defined(CARTESIO_UI)
@@ -385,16 +387,16 @@ static void lcd_implementation_status_screen() {
     // SD Card Progress bar and clock
     if (IS_SD_PRINTING) {
       // Progress bar solid part
-      u8g.drawBox(55, 50, (unsigned int)(71.f * card.percentDone() / 100.f), 2 - (TALL_FONT_CORRECTION));
+      u8g.drawBox(55, 50, (unsigned int)(71 * card.percentDone() * 0.01), 2 - (TALL_FONT_CORRECTION));
     }
 
     u8g.setPrintPos(80,48);
 
     char buffer[10];
-    timestamp_t time(print_job_timer.duration());
-    time.toString(buffer, true);
-    if (time.timestamp != 0) lcd_print(buffer);
-    else lcd_printPGM(PSTR("--:--"));
+    duration_t elapsed = print_job_timer.duration();
+    elapsed.toDigital(buffer);
+    lcd_print(buffer);
+
   #endif
 
   // Extruders

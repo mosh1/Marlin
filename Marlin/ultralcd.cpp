@@ -31,7 +31,7 @@
 
 #if ENABLED(PRINTCOUNTER)
   #include "printcounter.h"
-  #include "timestamp_t.h"
+  #include "duration_t.h"
 #endif
 
 int preheatHotendTemp1, preheatBedTemp1, preheatFanSpeed1,
@@ -698,7 +698,7 @@ static void lcd_led_toggle() {
       }
       if (lcdDrawUpdate)
         lcd_implementation_drawedit(msg, ftostr43sign(
-          ((1000 * babysteps_done) / planner.axis_steps_per_mm[axis]) * 0.001f
+          ((1000 * babysteps_done) * planner.steps_to_mm[axis]) * 0.001f
         ));
     }
 
@@ -1796,6 +1796,7 @@ static void lcd_led_toggle() {
   }
 
   static void _reset_acceleration_rates() { planner.reset_acceleration_rates(); }
+  static void _planner_refresh_positioning() { planner.refresh_positioning(); }
 
   /**
    *
@@ -1832,16 +1833,16 @@ static void lcd_led_toggle() {
     MENU_ITEM_EDIT_CALLBACK(long5, MSG_AMAX MSG_E, &planner.max_acceleration_mm_per_s2[E_AXIS], 100, 99000, _reset_acceleration_rates);
     MENU_ITEM_EDIT(float5, MSG_A_RETRACT, &planner.retract_acceleration, 100, 99000);
     MENU_ITEM_EDIT(float5, MSG_A_TRAVEL, &planner.travel_acceleration, 100, 99000);
-    MENU_ITEM_EDIT(float52, MSG_XSTEPS, &planner.axis_steps_per_mm[X_AXIS], 5, 9999);
-    MENU_ITEM_EDIT(float52, MSG_YSTEPS, &planner.axis_steps_per_mm[Y_AXIS], 5, 9999);
+    MENU_ITEM_EDIT_CALLBACK(float52, MSG_XSTEPS, &planner.axis_steps_per_mm[X_AXIS], 5, 9999, _planner_refresh_positioning);
+    MENU_ITEM_EDIT_CALLBACK(float52, MSG_YSTEPS, &planner.axis_steps_per_mm[Y_AXIS], 5, 9999, _planner_refresh_positioning);
     MENU_ITEM_EDIT(float52, "T1 X offset", &hotend_offset[X_AXIS][1], -999, 999);
     MENU_ITEM_EDIT(float52, "T1 Y offset", &hotend_offset[Y_AXIS][1], -999, 999);
     #if ENABLED(DELTA)
-      MENU_ITEM_EDIT(float52, MSG_ZSTEPS, &planner.axis_steps_per_mm[Z_AXIS], 5, 9999);
+      MENU_ITEM_EDIT_CALLBACK(float52, MSG_ZSTEPS, &planner.axis_steps_per_mm[Z_AXIS], 5, 9999, _planner_refresh_positioning);
     #else
-      MENU_ITEM_EDIT(float51, MSG_ZSTEPS, &planner.axis_steps_per_mm[Z_AXIS], 5, 9999);
+      MENU_ITEM_EDIT_CALLBACK(float51, MSG_ZSTEPS, &planner.axis_steps_per_mm[Z_AXIS], 5, 9999, _planner_refresh_positioning);
     #endif
-    MENU_ITEM_EDIT(float51, MSG_ESTEPS, &planner.axis_steps_per_mm[E_AXIS], 5, 9999);
+    MENU_ITEM_EDIT_CALLBACK(float51, MSG_ESTEPS, &planner.axis_steps_per_mm[E_AXIS], 5, 9999, _planner_refresh_positioning);
     #if ENABLED(ABORT_ON_ENDSTOP_HIT_FEATURE_ENABLED)
       MENU_ITEM_EDIT(bool, MSG_ENDSTOP_ABORT, &stepper.abort_on_endstop_hit);
     #endif
@@ -2008,13 +2009,15 @@ static void lcd_led_toggle() {
         STATIC_ITEM(MSG_INFO_PRINT_COUNT ": ", false, false, itostr3left(stats.totalPrints));          // Print Count: 999
         STATIC_ITEM(MSG_INFO_COMPLETED_PRINTS"  : ", false, false, itostr3left(stats.finishedPrints)); // Completed  : 666
 
-        timestamp_t time(stats.printTime);
-        time.toString(buffer);
+        duration_t elapsed = stats.printTime;
+        elapsed.toString(buffer);
+
         STATIC_ITEM(MSG_INFO_PRINT_TIME ": ", false, false);                                           // Total print Time:
         STATIC_ITEM("", false, false, buffer);                                                         // 99y 364d 23h 59m 59s
 
-        time.timestamp = stats.longestPrint;
-        time.toString(buffer);
+        elapsed = stats.longestPrint;
+        elapsed.toString(buffer);
+
         STATIC_ITEM(MSG_INFO_PRINT_LONGEST ": ", false, false);                                        // Longest job time:
         STATIC_ITEM("", false, false, buffer);                                                         // 99y 364d 23h 59m 59s
 
