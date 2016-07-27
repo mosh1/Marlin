@@ -514,10 +514,10 @@
 // Below are the macros that are used to define the borders for the mesh area,
 // made available here for specialized needs, ie dual extruder setup.
 #if ENABLED(MESH_BED_LEVELING)
-  #define MESH_MIN_X 15
-  #define MESH_MAX_X 285
-  #define MESH_MIN_Y 15
-  #define MESH_MAX_Y 185
+  #define MESH_MIN_X 5
+  #define MESH_MAX_X 265
+  #define MESH_MIN_Y 25
+  #define MESH_MAX_Y 175
 #endif
 
 // @section extras

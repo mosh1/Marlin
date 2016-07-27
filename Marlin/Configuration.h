@@ -460,7 +460,7 @@
 // For example an inductive probe, or a setup that uses the nozzle to probe.
 // An inductive probe must be deactivated to go below
 // its trigger-point if hardware endstops are active.
-#define FIX_MOUNTED_PROBE
+//#define FIX_MOUNTED_PROBE
 
 // The BLTouch probe emulates a servo probe.
 //#define BLTOUCH
@@ -490,12 +490,12 @@
 //    |           |
 //    O-- FRONT --+
 //  (0,0)
-#define X_PROBE_OFFSET_FROM_EXTRUDER 52  // X offset: -left  +right  [of the nozzle]
-#define Y_PROBE_OFFSET_FROM_EXTRUDER -54  // Y offset: -front +behind [the nozzle]
-#define Z_PROBE_OFFSET_FROM_EXTRUDER -4   // Z offset: -below +above  [the nozzle]
+#define X_PROBE_OFFSET_FROM_EXTRUDER 0  // X offset: -left  +right  [of the nozzle]
+#define Y_PROBE_OFFSET_FROM_EXTRUDER 0  // Y offset: -front +behind [the nozzle]
+#define Z_PROBE_OFFSET_FROM_EXTRUDER 0   // Z offset: -below +above  [the nozzle]
 
 // X and Y axis travel speed (mm/m) between probes
-#define XY_PROBE_SPEED 8000
+#define XY_PROBE_SPEED 3000
 // Speed for the first approach when probing
 #define Z_PROBE_SPEED_FAST HOMING_FEEDRATE_Z
 // Speed for the second approach when probing
@@ -539,7 +539,7 @@
 
 // Enable Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN to use the Z_MIN_PIN for your Z_MIN_PROBE.
 // The Z_MIN_PIN will then be used for both Z-homing and probing.
-#define Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN
+//#define Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN
 
 // To use a probe you must enable one of the two options above!
 
@@ -550,7 +550,7 @@
 //#define DISABLE_Z_MIN_PROBE_ENDSTOP
 
 // Enable Z Probe Repeatability test to see how accurate your probe is
-#define Z_MIN_PROBE_REPEATABILITY_TEST
+//#define Z_MIN_PROBE_REPEATABILITY_TEST
 
 //
 // Probe Raise options provide clearance for the probe to deploy, stow, and travel.
@@ -647,7 +647,7 @@
   #define MESH_INSET 5        // Mesh inset margin on print area
   #define MESH_NUM_X_POINTS 3  // Don't use more than 7 points per axis, implementation limited.
   #define MESH_NUM_Y_POINTS 3
-  #define MESH_HOME_SEARCH_Z 1  // Z after Home, bed somewhere below but above 0.0.
+  #define MESH_HOME_SEARCH_Z 3  // Z after Home, bed somewhere below but above 0.0.
 
   //#define MESH_G28_REST_ORIGIN // After homing all axes ('G28' or 'G28 XYZ') rest at origin [0,0,0]
 
@@ -750,8 +750,8 @@
 #define Z_SAFE_HOMING
 
 #if ENABLED(Z_SAFE_HOMING)
-  #define Z_SAFE_HOMING_X_POINT (25)    // X point for Z homing when homing all axis (G28).
-  #define Z_SAFE_HOMING_Y_POINT (25)    // Y point for Z homing when homing all axis (G28).
+  #define Z_SAFE_HOMING_X_POINT (-29)    // X point for Z homing when homing all axis (G28).
+  #define Z_SAFE_HOMING_Y_POINT (75)    // Y point for Z homing when homing all axis (G28).
 #endif
 
 // Homing speeds (mm/m)
