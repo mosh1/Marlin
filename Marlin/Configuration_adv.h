@@ -517,7 +517,7 @@
   #define MESH_MIN_X (X_MIN_POS + MESH_INSET)
   #define MESH_MAX_X (X_MAX_POS - (MESH_INSET))
   #define MESH_MIN_Y (Y_MIN_POS + MESH_INSET)
-  #define MESH_MAX_Y (Y_MAX_POS - (MESH_INSET))
+  #define MESH_MAX_Y (195)
 #endif
 
 // @section extras
