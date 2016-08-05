@@ -505,7 +505,8 @@
 #define LIN_ADVANCE
 
 #if ENABLED(LIN_ADVANCE)
-  #define LIN_ADVANCE_K 75
+// Good value for E3D Titan & V6 0.4mm nozzle & PLA
+  #define LIN_ADVANCE_K 50
 #endif
 
 // @section leveling
