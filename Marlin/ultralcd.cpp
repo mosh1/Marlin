@@ -1405,11 +1405,10 @@ void kill_screen(const char* lcd_msg) {
     if (_MOVE_XYZ_ALLOWED) {
       MENU_ITEM(submenu, MSG_MOVE_X, lcd_move_x);
       MENU_ITEM(submenu, MSG_MOVE_Y, lcd_move_y);
+      MENU_ITEM(submenu, MSG_MOVE_Z, lcd_move_z);  // moved menu item of Z to 10 mm menu
     }
 
     if (move_menu_scale < 10.0) {
-      if (_MOVE_XYZ_ALLOWED) MENU_ITEM(submenu, MSG_MOVE_Z, lcd_move_z);
-
       #if ENABLED(SWITCHING_EXTRUDER)
         if (active_extruder)
           MENU_ITEM(gcode, MSG_SELECT MSG_E1, PSTR("T0"));
@@ -1461,6 +1460,14 @@ void kill_screen(const char* lcd_msg) {
     MENU_ITEM(submenu, MSG_MOVE_1MM, lcd_move_menu_1mm);
     MENU_ITEM(submenu, MSG_MOVE_01MM, lcd_move_menu_01mm);
     //TODO:X,Y,Z,E
+
+    // Add Move to 295 for BigBox
+    if (axis_homed[Z_AXIS]) {
+      MENU_ITEM(gcode, "Move Z to 295", PSTR("G1 Z295 F3000"));
+    }
+    else {
+      MENU_ITEM(gcode, "Move Z to 295", PSTR("G28\nG1 Z295 F3000"));
+    }
     END_MENU();
   }
 
