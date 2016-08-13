@@ -949,7 +949,7 @@
 //  - Total time printing
 //
 // This information can be viewed by the M78 command.
-#define PRINTCOUNTER
+//#define PRINTCOUNTER
 
 //=============================================================================
 //============================= LCD and SD support ============================
