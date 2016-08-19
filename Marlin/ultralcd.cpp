@@ -799,15 +799,15 @@ void kill_screen(const char* lcd_msg) {
     // Flow 4:
     //
     #if EXTRUDERS == 1
-      MENU_ITEM_EDIT(int3, MSG_FLOW, &extruder_multiplier[0], 10, 999);
+      MENU_ITEM_EDIT(int3, MSG_FLOW, &flow_percentage[0], 10, 999);
     #else // EXTRUDERS > 1
-      MENU_ITEM_EDIT(int3, MSG_FLOW, &extruder_multiplier[active_extruder], 10, 999);
-      MENU_ITEM_EDIT(int3, MSG_FLOW MSG_N1, &extruder_multiplier[0], 10, 999);
-      MENU_ITEM_EDIT(int3, MSG_FLOW MSG_N2, &extruder_multiplier[1], 10, 999);
+      MENU_ITEM_EDIT(int3, MSG_FLOW, &flow_percentage[active_extruder], 10, 999);
+      MENU_ITEM_EDIT(int3, MSG_FLOW MSG_N1, &flow_percentage[0], 10, 999);
+      MENU_ITEM_EDIT(int3, MSG_FLOW MSG_N2, &flow_percentage[1], 10, 999);
       #if EXTRUDERS > 2
-        MENU_ITEM_EDIT(int3, MSG_FLOW MSG_N3, &extruder_multiplier[2], 10, 999);
+        MENU_ITEM_EDIT(int3, MSG_FLOW MSG_N3, &flow_percentage[2], 10, 999);
         #if EXTRUDERS > 3
-          MENU_ITEM_EDIT(int3, MSG_FLOW MSG_N4, &extruder_multiplier[3], 10, 999);
+          MENU_ITEM_EDIT(int3, MSG_FLOW MSG_N4, &flow_percentage[3], 10, 999);
         #endif //EXTRUDERS > 3
       #endif //EXTRUDERS > 2
     #endif //EXTRUDERS > 1
@@ -2693,6 +2693,12 @@ void lcd_update() {
           break;
       }
 
+      #if ENABLED(ULTIPANEL)
+        #define CURRENTSCREEN() (*currentScreen)()
+      #else
+        #define CURRENTSCREEN() lcd_status_screen()
+      #endif
+
       #if ENABLED(DOGLCD)  // Changes due to different driver architecture of the DOGM display
         static int8_t dot_color = 0;
         dot_color = 1 - dot_color;
@@ -2703,12 +2709,10 @@ void lcd_update() {
           u8g.setColorIndex(dot_color); // Set color for the alive dot
           u8g.drawPixel(127, 63); // draw alive dot
           u8g.setColorIndex(1); // black on white
-          (*currentScreen)();
+          CURRENTSCREEN();
         } while (u8g.nextPage());
-      #elif ENABLED(ULTIPANEL)
-        (*currentScreen)();
       #else
-        lcd_status_screen();
+        CURRENTSCREEN();
       #endif
     }
 
