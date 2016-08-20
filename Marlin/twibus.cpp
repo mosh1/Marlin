@@ -42,74 +42,165 @@ void TWIBus::reset() {
   this->buffer[0] = 0x00;
 }
 
-void TWIBus::address(const uint8_t addr) {
-  this->addr = addr;
+void TWIBus::address(const uint8_t adr) {
+  if (adr < 8 || adr > 127) {
+    SERIAL_ECHO_START;
+    SERIAL_ECHOLNPGM("Bad I2C address (8-127)");
+  }
+
+  this->addr = adr;
 
   #if ENABLED(DEBUG_TWIBUS)
-    debug(PSTR("address"), this->addr);
+    debug(PSTR("address"), adr);
   #endif
 }
 
 void TWIBus::addbyte(const char c) {
-  if (buffer_s >= sizeof(this->buffer)) return;
+  if (this->buffer_s >= COUNT(this->buffer)) return;
   this->buffer[this->buffer_s++] = c;
-
   #if ENABLED(DEBUG_TWIBUS)
-    debug(PSTR("addbyte"), this->buffer[this->buffer_s - 1]);
+    debug(PSTR("addbyte"), c);
   #endif
+}
+
+void TWIBus::addbytes(char src[], uint8_t bytes) {
+  #if ENABLED(DEBUG_TWIBUS)
+    debug(PSTR("addbytes"), bytes);
+  #endif
+  while (bytes--) this->addbyte(*src++);
+}
+
+void TWIBus::addstring(char str[]) {
+  #if ENABLED(DEBUG_TWIBUS)
+    debug(PSTR("addstring"), str);
+  #endif
+  while (char c = *str++) this->addbyte(c);
 }
 
 void TWIBus::send() {
   if (!this->addr) return;
 
   #if ENABLED(DEBUG_TWIBUS)
-    debug(PSTR("send()"));
+    debug(PSTR("send"), this->addr);
   #endif
 
   Wire.beginTransmission(this->addr);
   Wire.write(this->buffer, this->buffer_s);
   Wire.endTransmission();
 
-  // Reset the buffer after sending the data
   this->reset();
 }
 
-void TWIBus::reqbytes(const uint8_t bytes) {
-  if (!this->addr) return;
-
-  #if ENABLED(DEBUG_TWIBUS)
-    debug(PSTR("reqbytes"), bytes);
-  #endif
-
-  // requestFrom() is a blocking function
-  millis_t t = millis() + this->timeout;
-  Wire.requestFrom(this->addr, bytes);
-  while (Wire.available() < bytes && PENDING(millis(), t)) { /*nada*/ }
-
-  this->relaydata(bytes);
-
-  // Reset the buffer after sending the data
-  this->reset();
-}
-
-void TWIBus::relaydata(uint8_t bytes) {
+// static
+void TWIBus::echoprefix(uint8_t bytes, const char prefix[], uint8_t adr) {
   SERIAL_ECHO_START;
-  SERIAL_ECHOPAIR("i2c-reply: from:", this->addr);
+  serialprintPGM(prefix);
+  SERIAL_ECHOPAIR(": from:", adr);
   SERIAL_ECHOPAIR(" bytes:", bytes);
   SERIAL_ECHOPGM (" data:");
+}
+
+// static
+void TWIBus::echodata(uint8_t bytes, const char prefix[], uint8_t adr) {
+  echoprefix(bytes, prefix, adr);
   while (bytes-- && Wire.available()) SERIAL_CHAR(Wire.read());
   SERIAL_EOL;
 }
 
+void TWIBus::echobuffer(const char prefix[], uint8_t adr) {
+  echoprefix(this->buffer_s, prefix, adr);
+  for (uint8_t i = 0; i < this->buffer_s; i++) SERIAL_CHAR(this->buffer[i]);
+  SERIAL_EOL;
+}
+
+bool TWIBus::request(const uint8_t bytes) {
+  if (!this->addr) return false;
+
+  #if ENABLED(DEBUG_TWIBUS)
+    debug(PSTR("request"), bytes);
+  #endif
+
+  // requestFrom() is a blocking function
+  Wire.requestFrom(this->addr, bytes);
+
+  // Wait for all bytes to arrive
+  millis_t t = millis() + this->timeout;
+  while (Wire.available() < bytes)
+    if (ELAPSED(millis(), t)) {
+      #if ENABLED(DEBUG_TWIBUS)
+        SERIAL_ECHO_START;
+        SERIAL_ECHOLNPGM("i2c timeout");
+      #endif
+      return false;
+    }
+
+  return true;
+}
+
+void TWIBus::relay(const uint8_t bytes) {
+  #if ENABLED(DEBUG_TWIBUS)
+    debug(PSTR("relay"), bytes);
+  #endif
+
+  if (this->request(bytes))
+    echodata(bytes, PSTR("i2c-reply"), this->addr);
+}
+
+uint8_t TWIBus::capture(char *dst, const uint8_t bytes) {
+  this->reset();
+  uint8_t count = 0;
+  while (count < bytes && Wire.available())
+    dst[count++] = Wire.read();
+  return count;
+}
+
+// static
+void TWIBus::flush() {
+  while (Wire.available()) Wire.read();
+}
+
+#if I2C_SLAVE_ADDRESS > 0
+
+  void TWIBus::receive(uint8_t bytes) {
+    #if ENABLED(DEBUG_TWIBUS)
+      debug(PSTR("receive"), bytes);
+    #endif
+    echodata(bytes, PSTR("i2c-receive"), 0);
+  }
+
+  void TWIBus::reply(char str[]/*=NULL*/) {
+    #if ENABLED(DEBUG_TWIBUS)
+      debug(PSTR("reply"), str);
+    #endif
+
+    if (str) {
+      this->reset();
+      this->addstring(str);
+    }
+
+    Wire.write(this->buffer, this->buffer_s);
+
+    this->reset();
+  }
+
+#endif
+
 #if ENABLED(DEBUG_TWIBUS)
 
-  void TWIBus::debug(const char func[], int32_t val/*=-1*/) {
-    if (DEBUGGING(INFO)) {
-      SERIAL_ECHOPGM("TWIBus::");
-      serialprintPGM(func);
-      if (val >= 0) SERIAL_ECHOPAIR(": ", val);
-      SERIAL_EOL;
-    }
+  // static
+  void TWIBus::prefix(const char func[]) {
+    SERIAL_ECHOPGM("TWIBus::");
+    serialprintPGM(func);
+    SERIAL_ECHOPGM(": ");
+  }
+  void TWIBus::debug(const char func[], uint32_t adr) {
+    if (DEBUGGING(INFO)) { prefix(func); SERIAL_ECHOLN(adr); }
+  }
+  void TWIBus::debug(const char func[], char c) {
+    if (DEBUGGING(INFO)) { prefix(func); SERIAL_ECHOLN(c); }
+  }
+  void TWIBus::debug(const char func[], char str[]) {
+    if (DEBUGGING(INFO)) { prefix(func); SERIAL_ECHOLN(str); }
   }
 
 #endif
