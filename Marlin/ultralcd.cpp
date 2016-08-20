@@ -1197,6 +1197,48 @@ void kill_screen(const char* lcd_msg) {
 
   /**
    *
+   * "Filament Load/Unload" submenu
+   *
+   */
+
+  static void _load_filament_pla() {
+    enqueue_and_echo_commands_P(PSTR("G28\nG1 X95 Y235 F3000\nT0\nM109 S200\nG92 E0\nG1 E50 F150\nM400\nG1 X95 Y200 F3000\nG1 X95 Y235 F3000\nM104 S0\nT0"));
+    lcd_return_to_status();
+  }
+
+  static void _unload_filament_pla() {
+    enqueue_and_echo_commands_P(PSTR("T0\nM109 S200\nG92 E0\nG1 E10 F200\nG1 E-120 F350\nM400\nM104 S0\nT0"));
+    lcd_return_to_status();
+  }
+
+  static void _load_filament_petg() {
+    enqueue_and_echo_commands_P(PSTR("G28\nG1 X95 Y235 F3000\nT0\nM109 S235\nG92 E0\nG1 E50 F150\nM400\nG1 X95 Y200 F3000\nG1 X95 Y235 F3000\nM104 S0\nT0"));
+    lcd_return_to_status();
+  }
+
+  static void _unload_filament_petg() {
+    enqueue_and_echo_commands_P(PSTR("T0\nM109 S235\nG92 E0\nG1 E10 F200\nG1 E-120 F350\nM400\nM104 S0\nT0"));
+    lcd_return_to_status();
+  }
+
+  static void _lcd_filament_load_menu() {
+    START_MENU();
+    MENU_ITEM(back, MSG_PREPARE);    
+    MENU_ITEM(submenu, "PLA", _load_filament_pla);
+    MENU_ITEM(submenu, "PETG", _load_filament_petg);
+    END_MENU();
+  }
+
+  static void _lcd_filament_unload_menu() {
+    START_MENU();
+    MENU_ITEM(back, MSG_PREPARE);        
+    MENU_ITEM(submenu, "PLA", _unload_filament_pla);
+    MENU_ITEM(submenu, "PETG", _unload_filament_petg);
+    END_MENU();  
+  }
+
+  /**
+   *
    * "Prepare" submenu
    *
    */
@@ -1210,10 +1252,8 @@ void kill_screen(const char* lcd_msg) {
     MENU_ITEM(back, MSG_MAIN);
 
     // Load & Unload Filament
-    MENU_ITEM(gcode, "Load filament (PLA)", PSTR("G28\nG1 X95 Y235 F3000\nT0\nM109 S200\nG92 E0\nG1 E50 F150\nM400\nG1 X95 Y235 F3000\nM104 S0\nT0"));
-    MENU_ITEM(gcode, "Unload filament (PLA)", PSTR("T0\nM109 S200\nG92 E0\nG1 E10 F200\nG1 E-120 F350\nM400\nM104 S0\nT0"));
-    MENU_ITEM(gcode, "Load filament (PETG)", PSTR("G28\nG1 X95 Y235 F3000\nT0\nM109 S235\nG92 E0\nG1 E50 F150\nM400\nG1 X95 Y235 F3000\nM104 S0\nT0"));
-    MENU_ITEM(gcode, "Unload filament (PETG)", PSTR("T0\nM109 S200\nG92 E0\nG1 E10 F235\nG1 E-120 F350\nM400\nM104 S0\nT0"));
+    MENU_ITEM(submenu, "Load filament", _lcd_filament_load_menu);
+    MENU_ITEM(submenu, "Unload filament", _lcd_filament_unload_menu);
 
     //
     // Auto Home
