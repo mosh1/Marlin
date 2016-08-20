@@ -593,6 +593,22 @@ void kill_screen(const char* lcd_msg) {
       #if ENABLED(DELTA_CALIBRATION_MENU)
         MENU_ITEM(submenu, MSG_DELTA_CALIBRATE, lcd_delta_calibrate_menu);
       #endif
+
+    // Load & Unload Filament
+    MENU_ITEM(gcode, "Load Filament (PLA)", PSTR("G28\nG1 X95 Y235 F3000\nT0\nM109 S200\nG92 E0\nG1 E50 F150\nG1 X95 Y235 F3000\nM104 S0\nT0"));
+    MENU_ITEM(gcode, "Unload Filament (PLA)", PSTR("T0\nM109 S200\nG92 E0\nG1 E10 F200\nG1 E-120 F350\nM104 S0\nT0"));
+
+    //
+    // Move Axis
+    //
+    MENU_ITEM(submenu, MSG_MOVE_AXIS, lcd_move_menu);
+
+    //
+    // Disable Steppers
+    //
+    MENU_ITEM(gcode, MSG_DISABLE_STEPPERS, PSTR("M84"));
+
+    MENU_ITEM(gcode, "Lower Bed", PSTR("G91\nG1 Z30 F3000\nG90"));
     }
     MENU_ITEM(submenu, MSG_CONTROL, lcd_control_menu);
 
@@ -1212,12 +1228,12 @@ void kill_screen(const char* lcd_msg) {
     //
     // Move Axis
     //
-    MENU_ITEM(submenu, MSG_MOVE_AXIS, lcd_move_menu);
+    // MENU_ITEM(submenu, MSG_MOVE_AXIS, lcd_move_menu);
 
     //
     // Disable Steppers
     //
-    MENU_ITEM(gcode, MSG_DISABLE_STEPPERS, PSTR("M84"));
+    // MENU_ITEM(gcode, MSG_DISABLE_STEPPERS, PSTR("M84"));
 
     //
     // Preheat PLA
