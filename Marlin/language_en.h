@@ -103,7 +103,7 @@
   #define MSG_PREHEAT_1_SETTINGS              MSG_PREHEAT_1 " conf"
 #endif
 #ifndef MSG_PREHEAT_2
-  #define MSG_PREHEAT_2                       "Preheat ABS"
+  #define MSG_PREHEAT_2                       "Preheat PETG"
 #endif
 #ifndef MSG_PREHEAT_2_N
   #define MSG_PREHEAT_2_N                     MSG_PREHEAT_2 " "

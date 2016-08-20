@@ -582,11 +582,21 @@ void kill_screen(const char* lcd_msg) {
    *
    */
 
+  void lcd_cooldown() {
+    #if FAN_COUNT > 0
+      for (uint8_t i = 0; i < FAN_COUNT; i++) fanSpeeds[i] = 0;
+    #endif
+    thermalManager.disable_all_heaters();
+    lcd_return_to_status();
+  }
+
   static void lcd_main_menu() {
     START_MENU();
     MENU_ITEM(back, MSG_WATCH);
     if (planner.movesplanned() || IS_SD_PRINTING) {
       MENU_ITEM(submenu, MSG_TUNE, lcd_tune_menu);
+      MENU_ITEM(submenu, MSG_CONTROL, lcd_control_menu);
+
     }
     else {
       MENU_ITEM(submenu, MSG_PREPARE, lcd_prepare_menu);
@@ -594,23 +604,24 @@ void kill_screen(const char* lcd_msg) {
         MENU_ITEM(submenu, MSG_DELTA_CALIBRATE, lcd_delta_calibrate_menu);
       #endif
 
-    // Load & Unload Filament
-    MENU_ITEM(gcode, "Load Filament (PLA)", PSTR("G28\nG1 X95 Y235 F3000\nT0\nM109 S200\nG92 E0\nG1 E50 F150\nG1 X95 Y235 F3000\nM104 S0\nT0"));
-    MENU_ITEM(gcode, "Unload Filament (PLA)", PSTR("T0\nM109 S200\nG92 E0\nG1 E10 F200\nG1 E-120 F350\nM104 S0\nT0"));
+      //
+      // Move Axis
+      //
+      MENU_ITEM(submenu, MSG_MOVE_AXIS, lcd_move_menu);
 
-    //
-    // Move Axis
-    //
-    MENU_ITEM(submenu, MSG_MOVE_AXIS, lcd_move_menu);
+      MENU_ITEM(submenu, MSG_CONTROL, lcd_control_menu);
+      MENU_ITEM(gcode, "Lower bed 30mm", PSTR("G91\nG1 Z30 F3000\nG90"));
+      
+      //
+      // Disable Steppers
+      //
+      MENU_ITEM(gcode, MSG_DISABLE_STEPPERS, PSTR("M84"));
 
-    //
-    // Disable Steppers
-    //
-    MENU_ITEM(gcode, MSG_DISABLE_STEPPERS, PSTR("M84"));
-
-    MENU_ITEM(gcode, "Lower Bed", PSTR("G91\nG1 Z30 F3000\nG90"));
+      //
+      // Cooldown
+      //
+      MENU_ITEM(function, MSG_COOLDOWN, lcd_cooldown);
     }
-    MENU_ITEM(submenu, MSG_CONTROL, lcd_control_menu);
 
     #if ENABLED(SDSUPPORT)
       if (card.cardOK) {
@@ -972,13 +983,13 @@ void kill_screen(const char* lcd_msg) {
 
   #endif // TEMP_SENSOR_0 && (TEMP_SENSOR_1 || TEMP_SENSOR_2 || TEMP_SENSOR_3 || TEMP_SENSOR_BED)
 
-  void lcd_cooldown() {
-    #if FAN_COUNT > 0
-      for (uint8_t i = 0; i < FAN_COUNT; i++) fanSpeeds[i] = 0;
-    #endif
-    thermalManager.disable_all_heaters();
-    lcd_return_to_status();
-  }
+  // void lcd_cooldown() {
+  //   #if FAN_COUNT > 0
+  //     for (uint8_t i = 0; i < FAN_COUNT; i++) fanSpeeds[i] = 0;
+  //   #endif
+  //   thermalManager.disable_all_heaters();
+  //   lcd_return_to_status();
+  // }
 
   #if ENABLED(SDSUPPORT) && ENABLED(MENU_ADDAUTOSTART)
 
@@ -1198,6 +1209,12 @@ void kill_screen(const char* lcd_msg) {
     //
     MENU_ITEM(back, MSG_MAIN);
 
+    // Load & Unload Filament
+    MENU_ITEM(gcode, "Load filament (PLA)", PSTR("G28\nG1 X95 Y235 F3000\nT0\nM109 S200\nG92 E0\nG1 E50 F150\nM400\nG1 X95 Y235 F3000\nM104 S0\nT0"));
+    MENU_ITEM(gcode, "Unload filament (PLA)", PSTR("T0\nM109 S200\nG92 E0\nG1 E10 F200\nG1 E-120 F350\nM400\nM104 S0\nT0"));
+    MENU_ITEM(gcode, "Load filament (PETG)", PSTR("G28\nG1 X95 Y235 F3000\nT0\nM109 S235\nG92 E0\nG1 E50 F150\nM400\nG1 X95 Y235 F3000\nM104 S0\nT0"));
+    MENU_ITEM(gcode, "Unload filament (PETG)", PSTR("T0\nM109 S200\nG92 E0\nG1 E10 F235\nG1 E-120 F350\nM400\nM104 S0\nT0"));
+
     //
     // Auto Home
     //
@@ -1252,7 +1269,7 @@ void kill_screen(const char* lcd_msg) {
     //
     // Cooldown
     //
-    MENU_ITEM(function, MSG_COOLDOWN, lcd_cooldown);
+    // MENU_ITEM(function, MSG_COOLDOWN, lcd_cooldown);
 
     //
     // Switch power on/off
@@ -1481,7 +1498,7 @@ void kill_screen(const char* lcd_msg) {
 
   static void lcd_move_menu() {
     START_MENU();
-    MENU_ITEM(back, MSG_PREPARE);
+    MENU_ITEM(back, MSG_MAIN);
 
     if (_MOVE_XYZ_ALLOWED)
       MENU_ITEM(submenu, MSG_MOVE_10MM, lcd_move_menu_10mm);
