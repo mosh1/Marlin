@@ -3670,7 +3670,7 @@ inline void gcode_G28() {
 
           #if ENABLED(DELTA)
             // Avoid probing outside the round or hexagonal area of a delta printer
-            if (sq(xProbe) + sq(yProbe) > sq(DELTA_PROBEABLE_RADIUS)) continue;
+            if (sq(xProbe) + sq(yProbe) > sq(DELTA_PROBEABLE_RADIUS) + 0.1) continue;
           #endif
 
           float measured_z = probe_pt(xProbe, yProbe, stow_probe_after_each, verbose_level);
@@ -8487,13 +8487,10 @@ void prepare_move_to_destination() {
   void handle_status_leds(void) {
     if (ELAPSED(millis(), next_status_led_update_ms)) {
       next_status_led_update_ms += 500; // Update every 0.5s
-      float max_temp =
-        #if HAS_TEMP_BED
-          MAX3(max_temp, thermalManager.degTargetBed(), thermalManager.degBed())
-        #else
-          0.0
-        #endif
-      ;
+      float max_temp = 0.0;
+      #if HAS_TEMP_BED
+        max_temp = MAX3(max_temp, thermalManager.degTargetBed(), thermalManager.degBed());
+      #endif
       HOTEND_LOOP() {
         max_temp = MAX3(max_temp, thermalManager.degHotend(e), thermalManager.degTargetHotend(e));
       }
