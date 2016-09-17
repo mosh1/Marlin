@@ -75,35 +75,37 @@
 //
 
 //===========================================================================
-//========================= SCARA Settings ==================================
+//============================= SCARA Printer ===============================
 //===========================================================================
-// SCARA-mode for Marlin has been developed by QHARLEY in ZA in 2012/2013. Implemented
+// MORGAN_SCARA for Marlin was developed by QHARLEY in ZA in 2012/2013. Implemented
 // and slightly reworked by JCERNY in 06/2014 with the goal to bring it into Master-Branch
 // QHARLEYS Autobedlevelling has not been ported, because Marlin has now Bed-levelling
 // You might need Z-Min endstop on SCARA-Printer to use this feature. Actually untested!
-// Uncomment to use Morgan scara mode
-#define SCARA
-#define SCARA_SEGMENTS_PER_SECOND 200 // If movement is choppy try lowering this value
-// Length of inner support arm
-#define Linkage_1 150 //mm      Preprocessor cannot handle decimal point...
-// Length of outer support arm     Measure arm lengths precisely and enter
-#define Linkage_2 150 //mm
 
-// SCARA tower offset (position of Tower relative to bed zero position)
-// This needs to be reasonably accurate as it defines the printbed position in the SCARA space.
-#define SCARA_offset_x 100 //mm
-#define SCARA_offset_y -56 //mm
-#define SCARA_RAD2DEG 57.2957795  // to convert RAD to degrees
+// Specify the specific SCARA model
+#define MORGAN_SCARA
+//#define MAKERARM_SCARA
 
-#define THETA_HOMING_OFFSET 0  //calculatated from Calibration Guide and command M360 / M114 see picture in http://reprap.harleystudio.co.za/?page_id=1073
-#define PSI_HOMING_OFFSET   0  //calculatated from Calibration Guide and command M364 / M114 see picture in http://reprap.harleystudio.co.za/?page_id=1073
+#if ENABLED(MORGAN_SCARA) || ENABLED(MAKERARM_SCARA)
+  //#define DEBUG_SCARA_KINEMATICS
 
-//some helper variables to make kinematics faster
-#define L1_2 sq(Linkage_1) // do not change
-#define L2_2 sq(Linkage_2) // do not change
+  #define SCARA_SEGMENTS_PER_SECOND 200 // If movement is choppy try lowering this value
+  // Length of inner support arm
+  #define SCARA_LINKAGE_1 150 //mm      Preprocessor cannot handle decimal point...
+  // Length of outer support arm     Measure arm lengths precisely and enter
+  #define SCARA_LINKAGE_2 150 //mm
+
+  // SCARA tower offset (position of Tower relative to bed zero position)
+  // This needs to be reasonably accurate as it defines the printbed position in the SCARA space.
+  #define SCARA_OFFSET_X 100 //mm
+  #define SCARA_OFFSET_Y -56 //mm
+
+  #define THETA_HOMING_OFFSET 0  //calculatated from Calibration Guide and command M360 / M114 see picture in http://reprap.harleystudio.co.za/?page_id=1073
+  #define PSI_HOMING_OFFSET   0  //calculatated from Calibration Guide and command M364 / M114 see picture in http://reprap.harleystudio.co.za/?page_id=1073
+#endif
 
 //===========================================================================
-//========================= SCARA Settings end ==============================
+//==================== END ==== SCARA Printer ==== END ======================
 //===========================================================================
 
 // @section info
@@ -363,8 +365,9 @@
 #define EXTRUDE_MINTEMP 170
 
 // This option prevents a single extrusion longer than EXTRUDE_MAXLENGTH.
+// Note that for Bowden Extruders a too-small value here may prevent loading.
 #define PREVENT_LENGTHY_EXTRUDE
-#define EXTRUDE_MAXLENGTH (X_MAX_LENGTH+Y_MAX_LENGTH)
+#define EXTRUDE_MAXLENGTH 200
 
 //===========================================================================
 //======================== Thermal Runaway Protection =======================
@@ -438,9 +441,68 @@
 #define Z_MAX_ENDSTOP_INVERTING true  // set to true to invert the logic of the endstop.
 #define Z_MIN_PROBE_ENDSTOP_INVERTING false // set to true to invert the logic of the endstop.
 
+
+//=============================================================================
+//============================== Movement Settings ============================
+//=============================================================================
+// @section motion
+
+/**
+ * Default Settings
+ *
+ * These settings can be reset by M502
+ *
+ * Note that if EEPROM is enabled, saved values will override these.
+ */
+
+/**
+ * Default Axis Steps Per Unit (steps/mm)
+ * Override with M92
+ */
+#define DEFAULT_AXIS_STEPS_PER_UNIT   {103.69,106.65,200/1.25,1000}  // default steps per unit for SCARA
+
+/**
+ * Default Max Feed Rate (mm/s)
+ * Override with M203
+ */
+#define DEFAULT_MAX_FEEDRATE          { 300, 300, 30, 25 }
+
+/**
+ * Default Max Acceleration (change/s) change = mm/s
+ * Override with M201
+ *
+ * Maximum start speed for accelerated moves: { X, Y, Z, E }
+ */
+#define DEFAULT_MAX_ACCELERATION      { 300, 300, 20, 1000 }
+
+/**
+ * Default Acceleration (change/s) change = mm/s
+ * Override with M204
+ *
+ *   M204 P    Acceleration
+ *   M204 R    Retract Acceleration
+ *   M204 T    Travel Acceleration
+ */
+#define DEFAULT_ACCELERATION          400    // X, Y, Z and E acceleration for printing moves
+#define DEFAULT_RETRACT_ACCELERATION  2000   // E acceleration for retracts
+#define DEFAULT_TRAVEL_ACCELERATION   400    // X, Y, Z acceleration for travel (non printing) moves
+
+/**
+ * Defult Jerk (mm/s)
+ *
+ * "Jerk" specifies the minimum speed change that requires acceleration.
+ * When changing speed and direction, if the difference is less than the
+ * value set here, it may happen instantaneously.
+ */
+#define DEFAULT_XYJERK                5.0
+#define DEFAULT_ZJERK                 0.4
+#define DEFAULT_EJERK                 3.0
+
+
 //===========================================================================
 //============================= Z Probe Options =============================
 //===========================================================================
+// @section probes
 
 //
 // Probe Type
@@ -627,7 +689,7 @@
 //========================= Filament Runout Sensor ==========================
 //===========================================================================
 //#define FILAMENT_RUNOUT_SENSOR // Uncomment for defining a filament runout sensor such as a mechanical or opto endstop to check the existence of filament
-                                 // In RAMPS uses servo pin 2. Can be changed in pins file. For other boards pin definition should be made.
+                                 // RAMPS-based boards use SERVO3_PIN. For other boards you may need to define FIL_RUNOUT_PIN.
                                  // It is assumed that when logic high = filament available
                                  //                    when logic  low = filament ran out
 #if ENABLED(FILAMENT_RUNOUT_SENSOR)
@@ -752,26 +814,6 @@
 // Homing speeds (mm/m)
 #define HOMING_FEEDRATE_XY (40*60)
 #define HOMING_FEEDRATE_Z  (10*60)
-
-//
-// MOVEMENT SETTINGS
-// @section motion
-//
-
-// default settings
-
-#define DEFAULT_AXIS_STEPS_PER_UNIT   {103.69,106.65,200/1.25,1000}  // default steps per unit for SCARA
-#define DEFAULT_MAX_FEEDRATE          {300, 300, 30, 25}    // (mm/sec)
-#define DEFAULT_MAX_ACCELERATION      {300,300,20,1000}    // X, Y, Z, E maximum start speed for accelerated moves. E default values are good for Skeinforge 40+, for older versions raise them a lot.
-
-#define DEFAULT_ACCELERATION          400    // X, Y, Z and E acceleration in mm/s^2 for printing moves
-#define DEFAULT_RETRACT_ACCELERATION  2000   // E acceleration in mm/s^2 for retracts
-#define DEFAULT_TRAVEL_ACCELERATION   400    // X, Y, Z acceleration in mm/s^2 for travel (non printing) moves
-
-// The speed change that does not require acceleration (i.e. the software might assume it can be done instantaneously)
-#define DEFAULT_XYJERK                5    // (mm/sec)
-#define DEFAULT_ZJERK                 0.4    // (mm/sec)
-#define DEFAULT_EJERK                 3    // (mm/sec)
 
 
 //=============================================================================
