@@ -115,28 +115,11 @@
   #endif
 
   /**
-   * The BLTouch Probe emulates a servo probe
-   */
-  #if ENABLED(BLTOUCH)
-    #undef Z_ENDSTOP_SERVO_NR
-    #undef Z_SERVO_ANGLES
-    #define Z_ENDSTOP_SERVO_NR 0
-    #define Z_SERVO_ANGLES {10,90} // For BLTouch 10=deploy, 90=retract
-    #undef DEACTIVATE_SERVOS_AFTER_MOVE
-    #if ENABLED(Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN)
-      #undef Z_MIN_ENDSTOP_INVERTING
-      #define Z_MIN_ENDSTOP_INVERTING false
-    #endif
-  #endif
-
-  /**
    * Auto Bed Leveling and Z Probe Repeatability Test
    */
   #define HAS_PROBING_PROCEDURE (ENABLED(AUTO_BED_LEVELING_FEATURE) || ENABLED(Z_MIN_PROBE_REPEATABILITY_TEST))
 
   #define HOMING_Z_WITH_PROBE (HAS_BED_PROBE && Z_HOME_DIR < 0 && ENABLED(Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN))
-
-  #define HAS_Z_SERVO_ENDSTOP (defined(Z_ENDSTOP_SERVO_NR) && Z_ENDSTOP_SERVO_NR >= 0)
 
   /**
    * Z Sled Probe requires Z_SAFE_HOMING
@@ -426,9 +409,6 @@
     #if ENABLED(USE_ZMIN_PLUG)
       #define ENDSTOPPULLUP_ZMIN
     #endif
-    #if DISABLED(DISABLE_Z_MIN_PROBE_ENDSTOP)
-      #define ENDSTOPPULLUP_ZMIN_PROBE
-    #endif
   #endif
 
   /**
@@ -606,6 +586,9 @@
    * Bed Probe dependencies
    */
   #if HAS_BED_PROBE
+    #if ENABLED(ENDSTOPPULLUPS) && HAS_Z_MIN_PROBE_PIN
+      #define ENDSTOPPULLUP_ZMIN_PROBE
+    #endif
     #ifndef Z_PROBE_OFFSET_RANGE_MIN
       #define Z_PROBE_OFFSET_RANGE_MIN -20
     #endif
@@ -672,10 +655,11 @@
       #define AUTO_BED_LEVELING_NONLINEAR
     #else
       #define AUTO_BED_LEVELING_LINEAR
+      #define AUTO_BED_LEVELING_LINEAR_GRID
     #endif
   #endif
 
-  #define PLANNER_LEVELING (ENABLED(MESH_BED_LEVELING) || ENABLED(AUTO_BED_LEVELING_LINEAR))
+  #define PLANNER_LEVELING (ENABLED(MESH_BED_LEVELING) || ENABLED(AUTO_BED_LEVELING_FEATURE))
 
   /**
    * Buzzer/Speaker
