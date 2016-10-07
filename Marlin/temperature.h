@@ -157,10 +157,7 @@ class Temperature {
         static int lpq_ptr;
       #endif
 
-      static float pid_error[HOTENDS],
-                   temp_iState_min[HOTENDS],
-                   temp_iState_max[HOTENDS];
-      static bool pid_reset[HOTENDS];
+      static float pid_error[HOTENDS];
     #endif
 
     #if ENABLED(PIDTEMPBED)
@@ -169,9 +166,7 @@ class Temperature {
                    pTerm_bed,
                    iTerm_bed,
                    dTerm_bed,
-                   pid_error_bed,
-                   temp_iState_min_bed,
-                   temp_iState_max_bed;
+                   pid_error_bed;
     #else
       static millis_t next_bed_check_ms;
     #endif

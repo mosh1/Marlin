@@ -51,12 +51,12 @@
 //
 // Temperature Sensors
 //
-#define TEMP_0_PIN          0  // ANALOG INPUT !!
-#define TEMP_1_PIN          9  // 9 for tool2 -> 13 for chambertemp
-#define TEMP_2_PIN         13  // 10 for tool3 -> 13 for chambertemp
-#define TEMP_3_PIN         11  // 11 for tool4 -> 13 for chambertemp
-#define TEMP_BED_PIN       14  // ANALOG INPUT !!
-//#define TEMP_CHAMBER_PIN   13  // ANALOG INPUT !!
+#define TEMP_0_PIN          0   // Analog Input
+#define TEMP_1_PIN          9   // Analog Input.  9 for tool2 -> 13 for chambertemp
+#define TEMP_2_PIN         13   // Analog Input. 10 for tool3 -> 13 for chambertemp
+#define TEMP_3_PIN         11   // Analog Input. 11 for tool4 -> 13 for chambertemp
+#define TEMP_BED_PIN       14   // Analog Input
+//#define TEMP_CHAMBER_PIN   13   // Analog Input
 
 //
 // Heaters / Fans
@@ -111,8 +111,8 @@
 //#define UI1              43
 //#define UI2              37
 
-#define STAT_LED_BLUE      -1
-#define STAT_LED_RED       10 // TOOL_0_PWM_PIN
+#define STAT_LED_BLUE_PIN  -1
+#define STAT_LED_RED_PIN   10 // TOOL_0_PWM_PIN
 
 //
 // SD Card

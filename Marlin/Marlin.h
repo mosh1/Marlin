@@ -209,6 +209,11 @@ void manage_inactivity(bool ignore_stepper_queue = false);
 
 #endif // !MIXING_EXTRUDER
 
+#if ENABLED(G38_PROBE_TARGET)
+  extern bool G38_move,        // flag to tell the interrupt handler that a G38 command is being run
+              G38_endstop_hit; // flag from the interrupt handler to indicate if the endstop went active
+#endif
+
 /**
  * The axis order in all axis related arrays is X, Y, Z, E
  */
@@ -319,9 +324,9 @@ float code_value_temp_diff();
   void forward_kinematics_SCARA(const float &a, const float &b);
 #endif
 
-#if ENABLED(AUTO_BED_LEVELING_NONLINEAR)
-  extern int nonlinear_grid_spacing[2];
-  float nonlinear_z_offset(float logical[XYZ]);
+#if ENABLED(AUTO_BED_LEVELING_BILINEAR)
+  extern int bilinear_grid_spacing[2];
+  float bilinear_z_offset(float logical[XYZ]);
 #endif
 
 #if ENABLED(Z_DUAL_ENDSTOPS)
@@ -390,7 +395,7 @@ extern uint8_t active_extruder;
 void calculate_volumetric_multipliers();
 
 // Buzzer
-#if HAS_BUZZER && PIN_EXISTS(BEEPER)
+#if HAS_BUZZER && DISABLED(LCD_USE_I2C_BUZZER)
   #include "buzzer.h"
 #endif
 

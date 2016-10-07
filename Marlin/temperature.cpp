@@ -136,10 +136,7 @@ volatile bool Temperature::temp_meas_ready = false;
     int Temperature::lpq_ptr = 0;
   #endif
 
-  float Temperature::pid_error[HOTENDS],
-        Temperature::temp_iState_min[HOTENDS],
-        Temperature::temp_iState_max[HOTENDS];
-  bool Temperature::pid_reset[HOTENDS];
+  float Temperature::pid_error[HOTENDS];
 #endif
 
 #if ENABLED(PIDTEMPBED)
@@ -148,9 +145,7 @@ volatile bool Temperature::temp_meas_ready = false;
         Temperature::pTerm_bed,
         Temperature::iTerm_bed,
         Temperature::dTerm_bed,
-        Temperature::pid_error_bed,
-        Temperature::temp_iState_min_bed,
-        Temperature::temp_iState_max_bed;
+        Temperature::pid_error_bed;
 #else
   millis_t Temperature::next_bed_check_ms;
 #endif
@@ -199,7 +194,6 @@ uint8_t Temperature::soft_pwm[HOTENDS];
 #endif
 
 #if HAS_PID_HEATING
-
   void Temperature::PID_autotune(float temp, int hotend, int ncycles, bool set_result/*=false*/) {
     float input = 0.0;
     int cycles = 0;
@@ -240,13 +234,13 @@ uint8_t Temperature::soft_pwm[HOTENDS];
 
     #if HAS_PID_FOR_BOTH
       if (hotend < 0)
-        soft_pwm_bed = bias = d = (MAX_BED_POWER) / 2;
+        soft_pwm_bed = bias = d = (MAX_BED_POWER) >> 1;
       else
-        soft_pwm[hotend] = bias = d = (PID_MAX) / 2;
+        soft_pwm[hotend] = bias = d = (PID_MAX) >> 1;
     #elif ENABLED(PIDTEMP)
-      soft_pwm[hotend] = bias = d = (PID_MAX) / 2;
+      soft_pwm[hotend] = bias = d = (PID_MAX) >> 1;
     #else
-      soft_pwm_bed = bias = d = (MAX_BED_POWER) / 2;
+      soft_pwm_bed = bias = d = (MAX_BED_POWER) >> 1;
     #endif
 
     wait_for_heatup = true;
@@ -269,8 +263,8 @@ uint8_t Temperature::soft_pwm[HOTENDS];
           #endif
         ;
 
-        max = max(max, input);
-        min = min(min, input);
+        NOLESS(max, input);
+        NOMORE(min, input);
 
         #if HAS_AUTO_FAN
           if (ELAPSED(ms, next_auto_fan_check_ms)) {
@@ -448,12 +442,6 @@ void Temperature::updatePID() {
     #if ENABLED(PID_EXTRUSION_SCALING)
       last_e_position = 0;
     #endif
-    HOTEND_LOOP() {
-      temp_iState_max[e] = (PID_INTEGRAL_DRIVE_MAX) / PID_PARAM(Ki, e);
-    }
-  #endif
-  #if ENABLED(PIDTEMPBED)
-    temp_iState_max_bed = (PID_BED_INTEGRAL_DRIVE_MAX) / bedKi;
   #endif
 }
 
@@ -462,7 +450,6 @@ int Temperature::getHeaterPower(int heater) {
 }
 
 #if HAS_AUTO_FAN
-
   void Temperature::checkExtruderAutoFans() {
     const int8_t fanPin[] = { EXTRUDER_0_AUTO_FAN_PIN, EXTRUDER_1_AUTO_FAN_PIN, EXTRUDER_2_AUTO_FAN_PIN, EXTRUDER_3_AUTO_FAN_PIN };
     const int fanBit[] = {
@@ -545,26 +532,19 @@ float Temperature::get_pid_output(int e) {
   #endif
   float pid_output;
   #if ENABLED(PIDTEMP)
-    #if DISABLED(PID_OPENLOOP)
+    #if ENABLED(PID_OPENLOOP)
+      pid_output = constrain(target_temperature[HOTEND_INDEX], 0, PID_MAX);
+    #else
       pid_error[HOTEND_INDEX] = target_temperature[HOTEND_INDEX] - current_temperature[HOTEND_INDEX];
       dTerm[HOTEND_INDEX] = K2 * PID_PARAM(Kd, HOTEND_INDEX) * (current_temperature[HOTEND_INDEX] - temp_dState[HOTEND_INDEX]) + K1 * dTerm[HOTEND_INDEX];
       temp_dState[HOTEND_INDEX] = current_temperature[HOTEND_INDEX];
-      if (pid_error[HOTEND_INDEX] > PID_FUNCTIONAL_RANGE) {
-        pid_output = BANG_MAX;
-        pid_reset[HOTEND_INDEX] = true;
-      }
-      else if (pid_error[HOTEND_INDEX] < -(PID_FUNCTIONAL_RANGE) || target_temperature[HOTEND_INDEX] == 0) {
+      if (target_temperature[HOTEND_INDEX] == 0) {
         pid_output = 0;
-        pid_reset[HOTEND_INDEX] = true;
+        temp_iState[HOTEND_INDEX] = 0.0;
       }
       else {
-        if (pid_reset[HOTEND_INDEX]) {
-          temp_iState[HOTEND_INDEX] = 0.0;
-          pid_reset[HOTEND_INDEX] = false;
-        }
         pTerm[HOTEND_INDEX] = PID_PARAM(Kp, HOTEND_INDEX) * pid_error[HOTEND_INDEX];
         temp_iState[HOTEND_INDEX] += pid_error[HOTEND_INDEX];
-        temp_iState[HOTEND_INDEX] = constrain(temp_iState[HOTEND_INDEX], temp_iState_min[HOTEND_INDEX], temp_iState_max[HOTEND_INDEX]);
         iTerm[HOTEND_INDEX] = PID_PARAM(Ki, HOTEND_INDEX) * temp_iState[HOTEND_INDEX];
 
         pid_output = pTerm[HOTEND_INDEX] + iTerm[HOTEND_INDEX] - dTerm[HOTEND_INDEX];
@@ -595,8 +575,6 @@ float Temperature::get_pid_output(int e) {
           pid_output = 0;
         }
       }
-    #else
-      pid_output = constrain(target_temperature[HOTEND_INDEX], 0, PID_MAX);
     #endif //PID_OPENLOOP
 
     #if ENABLED(PID_DEBUG)
@@ -627,7 +605,6 @@ float Temperature::get_pid_output(int e) {
       pid_error_bed = target_temperature_bed - current_temperature_bed;
       pTerm_bed = bedKp * pid_error_bed;
       temp_iState_bed += pid_error_bed;
-      temp_iState_bed = constrain(temp_iState_bed, temp_iState_min_bed, temp_iState_max_bed);
       iTerm_bed = bedKi * temp_iState_bed;
 
       dTerm_bed = K2 * bedKd * (current_temperature_bed - temp_dState_bed) + K1 * dTerm_bed;
@@ -955,16 +932,10 @@ void Temperature::init() {
     // populate with the first value
     maxttemp[e] = maxttemp[0];
     #if ENABLED(PIDTEMP)
-      temp_iState_min[e] = 0.0;
-      temp_iState_max[e] = (PID_INTEGRAL_DRIVE_MAX) / PID_PARAM(Ki, e);
       #if ENABLED(PID_EXTRUSION_SCALING)
         last_e_position = 0;
       #endif
     #endif //PIDTEMP
-    #if ENABLED(PIDTEMPBED)
-      temp_iState_min_bed = 0.0;
-      temp_iState_max_bed = (PID_BED_INTEGRAL_DRIVE_MAX) / bedKi;
-    #endif //PIDTEMPBED
   }
 
   #if ENABLED(PIDTEMP) && ENABLED(PID_EXTRUSION_SCALING)
@@ -993,7 +964,7 @@ void Temperature::init() {
       setPwmFrequency(FAN_PIN, 1); // No prescaling. Pwm frequency = F_CPU/256/8
     #endif
     #if ENABLED(FAN_SOFT_PWM)
-      soft_pwm_fan[0] = fanSpeedSoftPwm[0] / 2;
+      soft_pwm_fan[0] = fanSpeedSoftPwm[0] >> 1;
     #endif
   #endif
 
@@ -1003,7 +974,7 @@ void Temperature::init() {
       setPwmFrequency(FAN1_PIN, 1); // No prescaling. Pwm frequency = F_CPU/256/8
     #endif
     #if ENABLED(FAN_SOFT_PWM)
-      soft_pwm_fan[1] = fanSpeedSoftPwm[1] / 2;
+      soft_pwm_fan[1] = fanSpeedSoftPwm[1] >> 1;
     #endif
   #endif
 
@@ -1013,7 +984,7 @@ void Temperature::init() {
       setPwmFrequency(FAN2_PIN, 1); // No prescaling. Pwm frequency = F_CPU/256/8
     #endif
     #if ENABLED(FAN_SOFT_PWM)
-      soft_pwm_fan[2] = fanSpeedSoftPwm[2] / 2;
+      soft_pwm_fan[2] = fanSpeedSoftPwm[2] >> 1;
     #endif
   #endif
 
@@ -1259,12 +1230,12 @@ void Temperature::init() {
         *state = TRStable;
       // While the temperature is stable watch for a bad temperature
       case TRStable:
-        if (temperature < tr_target_temperature[heater_index] - hysteresis_degc && ELAPSED(millis(), *timer))
-          *state = TRRunaway;
-        else {
+        if (temperature >= tr_target_temperature[heater_index] - hysteresis_degc) {
           *timer = millis() + period_seconds * 1000UL;
           break;
         }
+        else if (PENDING(millis(), *timer)) break;
+        *state = TRRunaway;
       case TRRunaway:
         _temp_error(heater_id, PSTR(MSG_T_THERMAL_RUNAWAY), PSTR(MSG_THERMAL_RUNAWAY));
     }
@@ -1473,15 +1444,15 @@ void Temperature::isr() {
 
       #if ENABLED(FAN_SOFT_PWM)
         #if HAS_FAN0
-          soft_pwm_fan[0] = fanSpeedSoftPwm[0] / 2;
+          soft_pwm_fan[0] = fanSpeedSoftPwm[0] >> 1;
           WRITE_FAN(soft_pwm_fan[0] > 0 ? 1 : 0);
         #endif
         #if HAS_FAN1
-          soft_pwm_fan[1] = fanSpeedSoftPwm[1] / 2;
+          soft_pwm_fan[1] = fanSpeedSoftPwm[1] >> 1;
           WRITE_FAN1(soft_pwm_fan[1] > 0 ? 1 : 0);
         #endif
         #if HAS_FAN2
-          soft_pwm_fan[2] = fanSpeedSoftPwm[2] / 2;
+          soft_pwm_fan[2] = fanSpeedSoftPwm[2] >> 1;
           WRITE_FAN2(soft_pwm_fan[2] > 0 ? 1 : 0);
         #endif
       #endif
@@ -1592,15 +1563,15 @@ void Temperature::isr() {
     #if ENABLED(FAN_SOFT_PWM)
       if (pwm_count == 0) {
         #if HAS_FAN0
-          soft_pwm_fan[0] = fanSpeedSoftPwm[0] / 2;
+          soft_pwm_fan[0] = fanSpeedSoftPwm[0] >> 1;
           WRITE_FAN(soft_pwm_fan[0] > 0 ? 1 : 0);
         #endif
         #if HAS_FAN1
-          soft_pwm_fan[1] = fanSpeedSoftPwm[1] / 2;
+          soft_pwm_fan[1] = fanSpeedSoftPwm[1] >> 1;
           WRITE_FAN1(soft_pwm_fan[1] > 0 ? 1 : 0);
         #endif
         #if HAS_FAN2
-          soft_pwm_fan[2] = fanSpeedSoftPwm[2] / 2;
+          soft_pwm_fan[2] = fanSpeedSoftPwm[2] >> 1;
           WRITE_FAN2(soft_pwm_fan[2] > 0 ? 1 : 0);
         #endif
       }

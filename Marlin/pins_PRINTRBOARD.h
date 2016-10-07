@@ -79,10 +79,11 @@
   #define Y_STOP_PIN        8 // Ystop in Ystop socket
 #endif
 #define Z_STOP_PIN         36
-#define TEMP_0_PIN          1  // Extruder / Analog pin numbering
-#define TEMP_BED_PIN        0  // Bed / Analog pin numbering
 
-#define FILWIDTH_PIN        2  // ANALOG NUMBERING
+#define TEMP_0_PIN          1   // Analog Input
+#define TEMP_BED_PIN        0   // Analog Input
+
+#define FILWIDTH_PIN        2   // Analog Input
 
 ////LCD Pin Setup////
 
@@ -131,8 +132,8 @@
 
   #define SDSS 45
   #define SD_DETECT_PIN -1 // FastIO (Manual says 72 I'm not certain cause I can't test)
-  #if ENABLED(TEMP_STAT_LEDS)
-    #define STAT_LED_RED      12 //Non-FastIO
-    #define STAT_LED_BLUE     10 //Non-FastIO
-  #endif
+
+  #define STAT_LED_RED_PIN  12 //Non-FastIO
+  #define STAT_LED_BLUE_PIN 10 //Non-FastIO
+
 #endif

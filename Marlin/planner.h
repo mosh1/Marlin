@@ -33,9 +33,10 @@
 #define PLANNER_H
 
 #include "types.h"
+#include "enum.h"
 #include "MarlinConfig.h"
 
-#if ENABLED(AUTO_BED_LEVELING_FEATURE)
+#if HAS_ABL
   #include "vector_3.h"
 #endif
 
@@ -131,12 +132,10 @@ class Planner {
     static float acceleration;         // Normal acceleration mm/s^2  DEFAULT ACCELERATION for all printing moves. M204 SXXXX
     static float retract_acceleration; // Retract acceleration mm/s^2 filament pull-back and push-forward while standing still in the other axes M204 TXXXX
     static float travel_acceleration;  // Travel acceleration mm/s^2  DEFAULT ACCELERATION for all NON printing moves. M204 MXXXX
-    static float max_xy_jerk;          // The largest speed change requiring no acceleration
-    static float max_z_jerk;
-    static float max_e_jerk;
+    static float max_jerk[XYZE];       // The largest speed change requiring no acceleration
     static float min_travel_feedrate_mm_s;
 
-    #if ENABLED(AUTO_BED_LEVELING_FEATURE)
+    #if HAS_ABL
       static bool abl_enabled;            // Flag that bed leveling is enabled
       static matrix_3x3 bed_level_matrix; // Transform to compensate for bed level
     #endif
@@ -202,7 +201,7 @@ class Planner {
 
     static bool is_full() { return (block_buffer_tail == BLOCK_MOD(block_buffer_head + 1)); }
 
-    #if ENABLED(AUTO_BED_LEVELING_FEATURE) || ENABLED(MESH_BED_LEVELING)
+    #if HAS_ABL || ENABLED(MESH_BED_LEVELING)
       #define ARG_X float lx
       #define ARG_Y float ly
       #define ARG_Z float lz
@@ -242,16 +241,15 @@ class Planner {
      * Clears previous speed values.
      */
     static void set_position_mm(ARG_X, ARG_Y, ARG_Z, const float& e);
+    static void set_position_mm(const AxisEnum axis, const float& v);
+
+    static FORCE_INLINE void set_z_position_mm(const float& z) { set_position_mm(Z_AXIS, z); }
+    static FORCE_INLINE void set_e_position_mm(const float& e) { set_position_mm(E_AXIS, e); }
 
     /**
      * Sync from the stepper positions. (e.g., after an interrupted move)
      */
     static void sync_from_steppers();
-
-    /**
-     * Set the E position (mm) of the planner (and the E stepper)
-     */
-    static void set_e_position_mm(const float& e);
 
     /**
      * Does the buffer have any blocks queued?

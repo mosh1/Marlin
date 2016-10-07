@@ -51,11 +51,11 @@
 //
 // Temperature Sensors
 //
-#define TEMP_0_PIN          0  // ANALOG INPUT !!
-#define TEMP_1_PIN          3  // 3 for tool2 -> 2 for chambertemp
-#define TEMP_2_PIN          2  // 9 for tool3 -> 2 for chambertemp
-#define TEMP_3_PIN         11  // 11 for tool4 -> 2 for chambertemp
-#define TEMP_BED_PIN        1  // ANALOG INPUT !!
+#define TEMP_0_PIN          0   // Analog Input
+#define TEMP_1_PIN          3   // Analog Input.  3 for tool2 -> 2 for chambertemp
+#define TEMP_2_PIN          2   // Analog Input.  9 for tool3 -> 2 for chambertemp
+#define TEMP_3_PIN         11   // Analog Input. 11 for tool4 -> 2 for chambertemp
+#define TEMP_BED_PIN        1   // Analog Input
 
 //
 // Heaters / Fans
@@ -115,5 +115,5 @@
 //
 // Misc. Functions
 //
-#define STAT_LED_BLUE      -1
-#define STAT_LED_RED       31
+#define STAT_LED_BLUE_PIN  -1
+#define STAT_LED_RED_PIN   31
