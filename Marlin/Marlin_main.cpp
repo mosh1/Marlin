@@ -33,20 +33,6 @@
 
 #include "Marlin.h"
 
-#if HAS_ABL
-  #include "vector_3.h"
-#endif
-
-#if ENABLED(AUTO_BED_LEVELING_LINEAR)
-  #include "qr_solve.h"
-#elif ENABLED(MESH_BED_LEVELING)
-  #include "mesh_bed_leveling.h"
-#endif
-
-#if ENABLED(BEZIER_CURVE_SUPPORT)
-  #include "planner_bezier.h"
-#endif
-
 #include "ultralcd.h"
 #include "planner.h"
 #include "stepper.h"
@@ -60,6 +46,23 @@
 #include "nozzle.h"
 #include "duration_t.h"
 #include "types.h"
+
+#if HAS_ABL
+  #include "vector_3.h"
+  #if ENABLED(AUTO_BED_LEVELING_LINEAR)
+    #include "qr_solve.h"
+  #endif
+#elif ENABLED(MESH_BED_LEVELING)
+  #include "mesh_bed_leveling.h"
+#endif
+
+#if ENABLED(BEZIER_CURVE_SUPPORT)
+  #include "planner_bezier.h"
+#endif
+
+#if HAS_BUZZER && DISABLED(LCD_USE_I2C_BUZZER)
+  #include "buzzer.h"
+#endif
 
 #if ENABLED(USE_WATCHDOG)
   #include "watchdog.h"
@@ -456,6 +459,22 @@ static uint8_t target_extruder;
   #define XY_PROBE_FEEDRATE_MM_S PLANNER_XY_FEEDRATE()
 #endif
 
+#if ENABLED(AUTO_BED_LEVELING_BILINEAR)
+  #if ENABLED(DELTA)
+    #define ADJUST_DELTA(V) \
+      if (planner.abl_enabled) { \
+        const float zadj = bilinear_z_offset(V); \
+        delta[A_AXIS] += zadj; \
+        delta[B_AXIS] += zadj; \
+        delta[C_AXIS] += zadj; \
+      }
+  #else
+    #define ADJUST_DELTA(V) if (planner.abl_enabled) { delta[Z_AXIS] += bilinear_z_offset(V); }
+  #endif
+#elif IS_KINEMATIC
+  #define ADJUST_DELTA(V) NOOP
+#endif
+
 #if ENABLED(Z_DUAL_ENDSTOPS)
   float z_endstop_adj = 0;
 #endif
@@ -711,8 +730,7 @@ inline void sync_plan_position_e() { planner.set_e_position_mm(current_position[
     #if ENABLED(DEBUG_LEVELING_FEATURE)
       if (DEBUGGING(LEVELING)) DEBUG_POS("sync_plan_position_kinematic", current_position);
     #endif
-    inverse_kinematics(current_position);
-    planner.set_position_mm(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], current_position[E_AXIS]);
+    planner.set_position_mm_kinematic(current_position);
   }
   #define SYNC_PLAN_POSITION_KINEMATIC() sync_plan_position_kinematic()
 
@@ -1541,8 +1559,7 @@ inline void set_destination_to_current() { memcpy(destination, current_position,
     ) return;
 
     refresh_cmd_timeout();
-    inverse_kinematics(destination);
-    planner.buffer_line(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], destination[E_AXIS], MMS_SCALED(fr_mm_s ? fr_mm_s : feedrate_mm_s), active_extruder);
+    planner.buffer_line_kinematic(destination, MMS_SCALED(fr_mm_s ? fr_mm_s : feedrate_mm_s), active_extruder);
     set_current_to_destination();
   }
 #endif // IS_KINEMATIC
@@ -2208,8 +2225,8 @@ static void clean_up_after_endstop_or_probe_move() {
     #elif HAS_ABL
 
       if (enable != planner.abl_enabled) {
-        planner.abl_enabled = !planner.abl_enabled;
-        if (!planner.abl_enabled)
+        planner.abl_enabled = enable;
+        if (!enable)
           set_current_from_steppers_for_axis(
             #if ABL_PLANAR
               ALL_AXES
@@ -2299,7 +2316,8 @@ static void clean_up_after_endstop_or_probe_move() {
     //                                : ((c < b) ? b : (a < c) ? a : c);
   }
 
-  #define EXTRAPOLATE_FROM_EDGE
+  //Enable this if your SCARA uses 180° of total area
+  //#define EXTRAPOLATE_FROM_EDGE
 
   #if ENABLED(EXTRAPOLATE_FROM_EDGE)
     #if ABL_GRID_POINTS_X < ABL_GRID_POINTS_Y
@@ -4550,7 +4568,9 @@ inline void gcode_M31() {
   SERIAL_ECHO_START;
   SERIAL_ECHOLNPAIR("Print time: ", buffer);
 
-  thermalManager.autotempShutdown();
+  #if ENABLED(AUTOTEMP)
+    thermalManager.autotempShutdown();
+  #endif
 }
 
 #if ENABLED(SDSUPPORT)
@@ -4690,7 +4710,7 @@ inline void gcode_M42() {
           pin_state[pin - first_pin] = digitalRead(pin);
       }
 
-      #if ENABLED(EMERGENCY_PARSER)
+      #if ENABLED(EMERGENCY_PARSER) && DISABLED(ULTIPANEL)
         wait_for_user = true;
       #endif
 
@@ -4708,7 +4728,7 @@ inline void gcode_M42() {
           }
         }
 
-        #if ENABLED(EMERGENCY_PARSER)
+        #if ENABLED(EMERGENCY_PARSER) && DISABLED(ULTIPANEL)
           if (!wait_for_user) break;
         #endif
 
@@ -4899,8 +4919,8 @@ inline void gcode_M42() {
       for (uint8_t j = 0; j <= n; j++) sum += sample_set[j];
       mean = sum / (n + 1);
 
-      if(sample_set[n] < min) min = sample_set[n];
-      if(sample_set[n] > max) max = sample_set[n];
+      NOMORE(min, sample_set[n]);
+      NOLESS(max, sample_set[n]);
 
       /**
        * Now, use that mean to calculate the standard deviation for the
@@ -4956,7 +4976,6 @@ inline void gcode_M42() {
     SERIAL_PROTOCOLPGM("Standard Deviation: ");
     SERIAL_PROTOCOL_F(sigma, 6);
     SERIAL_EOL;
-
     SERIAL_EOL;
 
     clean_up_after_endstop_or_probe_move();
@@ -6779,8 +6798,7 @@ inline void gcode_M503() {
 
     // Define runplan for move axes
     #if IS_KINEMATIC
-      #define RUNPLAN(RATE_MM_S) inverse_kinematics(destination); \
-                                 planner.buffer_line(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], destination[E_AXIS], RATE_MM_S, active_extruder);
+      #define RUNPLAN(RATE_MM_S) planner.buffer_line_kinematic(destination, RATE_MM_S, active_extruder);
     #else
       #define RUNPLAN(RATE_MM_S) line_to_destination(RATE_MM_S);
     #endif
@@ -6895,17 +6913,14 @@ inline void gcode_M503() {
     KEEPALIVE_STATE(IN_HANDLER);
 
     // Set extruder to saved position
-    current_position[E_AXIS] = lastpos[E_AXIS];
-    destination[E_AXIS] = lastpos[E_AXIS];
+    destination[E_AXIS] = current_position[E_AXIS] = lastpos[E_AXIS];
     planner.set_e_position_mm(current_position[E_AXIS]);
 
     #if IS_KINEMATIC
-      // Move XYZ to starting position, then E
-      inverse_kinematics(lastpos);
-      planner.buffer_line(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], destination[E_AXIS], FILAMENT_CHANGE_XY_FEEDRATE, active_extruder);
-      planner.buffer_line(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], lastpos[E_AXIS], FILAMENT_CHANGE_XY_FEEDRATE, active_extruder);
+      // Move XYZ to starting position
+      planner.buffer_line_kinematic(lastpos, FILAMENT_CHANGE_XY_FEEDRATE, active_extruder);
     #else
-      // Move XY to starting position, then Z, then E
+      // Move XY to starting position, then Z
       destination[X_AXIS] = lastpos[X_AXIS];
       destination[Y_AXIS] = lastpos[Y_AXIS];
       RUNPLAN(FILAMENT_CHANGE_XY_FEEDRATE);
@@ -7296,15 +7311,11 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
             float z_diff = hotend_offset[Z_AXIS][active_extruder] - hotend_offset[Z_AXIS][tmp_extruder],
                   z_raise = 0.3 + (z_diff > 0.0 ? z_diff : 0.0);
 
+            set_destination_to_current();
+
             // Always raise by some amount
-            planner.buffer_line(
-              current_position[X_AXIS],
-              current_position[Y_AXIS],
-              current_position[Z_AXIS] + z_raise,
-              current_position[E_AXIS],
-              planner.max_feedrate_mm_s[Z_AXIS],
-              active_extruder
-            );
+            destination[Z_AXIS] += z_raise;
+            planner.buffer_line_kinematic(destination, planner.max_feedrate_mm_s[Z_AXIS], active_extruder);
             stepper.synchronize();
 
             move_extruder_servo(active_extruder);
@@ -7312,14 +7323,8 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
 
             // Move back down, if needed
             if (z_raise != z_diff) {
-              planner.buffer_line(
-                current_position[X_AXIS],
-                current_position[Y_AXIS],
-                current_position[Z_AXIS] + z_diff,
-                current_position[E_AXIS],
-                planner.max_feedrate_mm_s[Z_AXIS],
-                active_extruder
-              );
+              destination[Z_AXIS] = current_position[Z_AXIS] + z_diff;
+              planner.buffer_line_kinematic(destination, planner.max_feedrate_mm_s[Z_AXIS], active_extruder);
               stepper.synchronize();
             }
           #endif
@@ -8671,8 +8676,7 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
 
     // If the move is only in Z/E don't split up the move
     if (ltarget[X_AXIS] == current_position[X_AXIS] && ltarget[Y_AXIS] == current_position[Y_AXIS]) {
-      inverse_kinematics(ltarget);
-      planner.buffer_line(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], ltarget[E_AXIS], _feedrate_mm_s, active_extruder);
+      planner.buffer_line_kinematic(ltarget, _feedrate_mm_s, active_extruder);
       return true;
     }
 
@@ -8765,7 +8769,10 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
       #define DELTA_NEXT(ADDEND) LOOP_XYZ(i) DELTA_VAR[i] += ADDEND;
 
       // Get the starting delta if interpolation is possible
-      if (segments >= 2) DELTA_IK();
+      if (segments >= 2) {
+        DELTA_IK();
+        ADJUST_DELTA(DELTA_VAR); // Adjust Z if bed leveling is enabled
+      }
 
       // Loop using decrement
       for (uint16_t s = segments + 1; --s;) {
@@ -8782,6 +8789,7 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
 
           // Get the exact delta for the move after this
           DELTA_IK();
+          ADJUST_DELTA(DELTA_VAR); // Adjust Z if bed leveling is enabled
 
           // Move to the interpolated delta position first
           planner.buffer_line(
@@ -8802,6 +8810,7 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
           DELTA_NEXT(segment_distance[i]);
           DELTA_VAR[E_AXIS] += segment_distance[E_AXIS];
           DELTA_IK();
+          ADJUST_DELTA(DELTA_VAR); // Adjust Z if bed leveling is enabled
         }
 
         // Move to the non-interpolated position
@@ -8815,16 +8824,14 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
       // For non-interpolated delta calculate every segment
       for (uint16_t s = segments + 1; --s;) {
         DELTA_NEXT(segment_distance[i]);
-        DELTA_IK();
-        planner.buffer_line(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], DELTA_VAR[E_AXIS], _feedrate_mm_s, active_extruder);
+        planner.buffer_line_kinematic(DELTA_VAR, _feedrate_mm_s, active_extruder);
       }
 
     #endif
 
     // Since segment_distance is only approximate,
     // the final move must be to the exact destination.
-    inverse_kinematics(ltarget);
-    planner.buffer_line(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], ltarget[E_AXIS], _feedrate_mm_s, active_extruder);
+    planner.buffer_line_kinematic(ltarget, _feedrate_mm_s, active_extruder);
     return true;
   }
 
@@ -9064,21 +9071,11 @@ void prepare_move_to_destination() {
 
       clamp_to_software_endstops(arc_target);
 
-      #if IS_KINEMATIC
-        inverse_kinematics(arc_target);
-        planner.buffer_line(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], arc_target[E_AXIS], fr_mm_s, active_extruder);
-      #else
-        planner.buffer_line(arc_target[X_AXIS], arc_target[Y_AXIS], arc_target[Z_AXIS], arc_target[E_AXIS], fr_mm_s, active_extruder);
-      #endif
+      planner.buffer_line_kinematic(arc_target, fr_mm_s, active_extruder);
     }
 
     // Ensure last segment arrives at target location.
-    #if IS_KINEMATIC
-      inverse_kinematics(logical);
-      planner.buffer_line(delta[A_AXIS], delta[B_AXIS], delta[C_AXIS], logical[E_AXIS], fr_mm_s, active_extruder);
-    #else
-      planner.buffer_line(logical[X_AXIS], logical[Y_AXIS], logical[Z_AXIS], logical[E_AXIS], fr_mm_s, active_extruder);
-    #endif
+    planner.buffer_line_kinematic(logical, fr_mm_s, active_extruder);
 
     // As far as the parser is concerned, the position is now == target. In reality the
     // motion control system might still be processing the action and the real tool position
@@ -9473,11 +9470,22 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
       #endif // !SWITCHING_EXTRUDER
 
       previous_cmd_ms = ms; // refresh_cmd_timeout()
-      planner.buffer_line(
-        current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS],
-        current_position[E_AXIS] + EXTRUDER_RUNOUT_EXTRUDE,
-        MMM_TO_MMS(EXTRUDER_RUNOUT_SPEED), active_extruder
-      );
+
+      #if IS_KINEMATIC
+        inverse_kinematics(current_position);
+        ADJUST_DELTA(current_position);
+        planner.buffer_line(
+          delta[A_AXIS], delta[B_AXIS], delta[C_AXIS],
+          current_position[E_AXIS] + EXTRUDER_RUNOUT_EXTRUDE,
+          MMM_TO_MMS(EXTRUDER_RUNOUT_SPEED), active_extruder
+        );
+      #else
+        planner.buffer_line(
+          current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS],
+          current_position[E_AXIS] + EXTRUDER_RUNOUT_EXTRUDE,
+          MMM_TO_MMS(EXTRUDER_RUNOUT_SPEED), active_extruder
+        );
+      #endif
       stepper.synchronize();
       planner.set_e_position_mm(current_position[E_AXIS]);
       #if ENABLED(SWITCHING_EXTRUDER)
@@ -9729,7 +9737,9 @@ void setup() {
       safe_delay(BOOTSCREEN_TIMEOUT);
     #elif ENABLED(ULTRA_LCD)
       bootscreen();
-      lcd_init();
+      #if DISABLED(SDSUPPORT)
+        lcd_init();
+      #endif
     #endif
   #endif
 
