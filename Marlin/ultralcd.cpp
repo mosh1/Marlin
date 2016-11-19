@@ -1256,7 +1256,7 @@ void kill_screen(const char* lcd_msg) {
 
   static void _lcd_filament_load_menu() {
     START_MENU();
-    MENU_ITEM(back, MSG_PREPARE);    
+    MENU_BACK(MSG_PREPARE);    
     MENU_ITEM(submenu, "PLA", _load_filament_pla);
     MENU_ITEM(submenu, "PETG", _load_filament_petg);
     END_MENU();
@@ -1264,7 +1264,7 @@ void kill_screen(const char* lcd_msg) {
 
   static void _lcd_filament_unload_menu() {
     START_MENU();
-    MENU_ITEM(back, MSG_PREPARE);        
+    MENU_BACK(MSG_PREPARE);        
     MENU_ITEM(submenu, "PLA", _unload_filament_pla);
     MENU_ITEM(submenu, "PETG", _unload_filament_petg);
     END_MENU();  
@@ -1587,7 +1587,7 @@ void kill_screen(const char* lcd_msg) {
 
   static void lcd_move_menu() {
     START_MENU();
-    MENU_ITEM(back, MSG_MAIN);
+    MENU_BACK(MSG_MAIN);
 
     if (_MOVE_XYZ_ALLOWED)
       MENU_ITEM(submenu, MSG_MOVE_10MM, lcd_move_menu_10mm);
