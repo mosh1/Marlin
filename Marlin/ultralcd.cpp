@@ -110,6 +110,9 @@ uint8_t lcdDrawUpdate = LCDVIEW_CLEAR_CALL_REDRAW; // Set when the LCD needs to 
   #if HAS_POWER_SWITCH
     extern bool powersupply;
   #endif
+  #if HAS_CASE_LIGHT
+    extern bool case_light_on;
+  #endif
   const float manual_feedrate_mm_m[] = MANUAL_FEEDRATE;
   static void lcd_main_menu();
   static void lcd_tune_menu();
@@ -181,6 +184,7 @@ uint8_t lcdDrawUpdate = LCDVIEW_CLEAR_CALL_REDRAW; // Set when the LCD needs to 
   static void menu_action_setting_edit_float5(const char* pstr, float* ptr, float minValue, float maxValue);
   static void menu_action_setting_edit_float51(const char* pstr, float* ptr, float minValue, float maxValue);
   static void menu_action_setting_edit_float52(const char* pstr, float* ptr, float minValue, float maxValue);
+  static void menu_action_setting_edit_float62(const char* pstr, float* ptr, float minValue, float maxValue);
   static void menu_action_setting_edit_long5(const char* pstr, unsigned long* ptr, unsigned long minValue, unsigned long maxValue);
   static void menu_action_setting_edit_callback_bool(const char* pstr, bool* ptr, screenFunc_t callbackFunc);
   static void menu_action_setting_edit_callback_int3(const char* pstr, int* ptr, int minValue, int maxValue, screenFunc_t callbackFunc);
@@ -190,6 +194,7 @@ uint8_t lcdDrawUpdate = LCDVIEW_CLEAR_CALL_REDRAW; // Set when the LCD needs to 
   static void menu_action_setting_edit_callback_float5(const char* pstr, float* ptr, float minValue, float maxValue, screenFunc_t callbackFunc);
   static void menu_action_setting_edit_callback_float51(const char* pstr, float* ptr, float minValue, float maxValue, screenFunc_t callbackFunc);
   static void menu_action_setting_edit_callback_float52(const char* pstr, float* ptr, float minValue, float maxValue, screenFunc_t callbackFunc);
+  static void menu_action_setting_edit_callback_float62(const char* pstr, float* ptr, float minValue, float maxValue, screenFunc_t callbackFunc);
   static void menu_action_setting_edit_callback_long5(const char* pstr, unsigned long* ptr, unsigned long minValue, unsigned long maxValue, screenFunc_t callbackFunc);
 
   #if ENABLED(SDSUPPORT)
@@ -589,6 +594,16 @@ void kill_screen(const char* lcd_msg) {
     START_MENU();
     MENU_BACK(MSG_WATCH);
 
+    //
+    // Switch case light on/off
+    //
+    #if HAS_CASE_LIGHT && ENABLED(MENU_ITEM_CASE_LIGHT)
+      if (case_light_on == 0)
+        MENU_ITEM(gcode, MSG_LIGHTS_ON, PSTR("M355 S1"));
+      else
+        MENU_ITEM(gcode, MSG_LIGHTS_OFF, PSTR("M355 S0"));
+    #endif
+
     #if ENABLED(BLTOUCH)
       if (!endstops.z_probe_enabled && TEST_BLTOUCH())
         MENU_ITEM(gcode, MSG_BLTOUCH_RESET, PSTR("M280 P" STRINGIFY(Z_ENDSTOP_SERVO_NR) " S" STRINGIFY(BLTOUCH_RESET)));
@@ -884,7 +899,7 @@ void kill_screen(const char* lcd_msg) {
 
     static void lcd_dac_menu() {
       dac_driver_getValues();
-      START_MENU();    
+      START_MENU();
       MENU_BACK(MSG_CONTROL);
       MENU_ITEM_EDIT_CALLBACK(int3, MSG_X " " MSG_DAC_PERCENT, &driverPercent[X_AXIS], 0, 100, dac_driver_commit);
       MENU_ITEM_EDIT_CALLBACK(int3, MSG_Y " " MSG_DAC_PERCENT, &driverPercent[Y_AXIS], 0, 100, dac_driver_commit);
@@ -1054,7 +1069,6 @@ void kill_screen(const char* lcd_msg) {
       current_position[X_AXIS] = LOGICAL_X_POSITION(x);
       current_position[Y_AXIS] = LOGICAL_Y_POSITION(y);
       planner.buffer_line_kinematic(current_position, MMM_TO_MMS(XY_PROBE_SPEED), active_extruder);
-
       #if Z_HOMING_HEIGHT > 0
         current_position[Z_AXIS] = LOGICAL_Z_POSITION(MESH_HOME_SEARCH_Z);
         line_to_current(Z_AXIS);
@@ -1628,7 +1642,7 @@ void kill_screen(const char* lcd_msg) {
       MENU_ITEM(submenu, MSG_RETRACT, lcd_control_retract_menu);
     #endif
     #if ENABLED(DAC_STEPPER_CURRENT)
-      MENU_ITEM(submenu, MSG_DRIVE_STRENGTH, lcd_dac_menu); 
+      MENU_ITEM(submenu, MSG_DRIVE_STRENGTH, lcd_dac_menu);
     #endif
 
     #if ENABLED(EEPROM_SETTINGS)
@@ -1922,14 +1936,10 @@ void kill_screen(const char* lcd_msg) {
     MENU_ITEM_EDIT_CALLBACK(long5, MSG_AMAX MSG_E, &planner.max_acceleration_mm_per_s2[E_AXIS], 100, 99000, _reset_acceleration_rates);
     MENU_ITEM_EDIT(float5, MSG_A_RETRACT, &planner.retract_acceleration, 100, 99000);
     MENU_ITEM_EDIT(float5, MSG_A_TRAVEL, &planner.travel_acceleration, 100, 99000);
-    MENU_ITEM_EDIT_CALLBACK(float52, MSG_XSTEPS, &planner.axis_steps_per_mm[X_AXIS], 5, 9999, _planner_refresh_positioning);
-    MENU_ITEM_EDIT_CALLBACK(float52, MSG_YSTEPS, &planner.axis_steps_per_mm[Y_AXIS], 5, 9999, _planner_refresh_positioning);
-    #if ENABLED(DELTA)
-      MENU_ITEM_EDIT_CALLBACK(float52, MSG_ZSTEPS, &planner.axis_steps_per_mm[Z_AXIS], 5, 9999, _planner_refresh_positioning);
-    #else
-      MENU_ITEM_EDIT_CALLBACK(float51, MSG_ZSTEPS, &planner.axis_steps_per_mm[Z_AXIS], 5, 9999, _planner_refresh_positioning);
-    #endif
-    MENU_ITEM_EDIT_CALLBACK(float51, MSG_ESTEPS, &planner.axis_steps_per_mm[E_AXIS], 5, 9999, _planner_refresh_positioning);
+    MENU_ITEM_EDIT_CALLBACK(float62, MSG_XSTEPS, &planner.axis_steps_per_mm[X_AXIS], 5, 9999, _planner_refresh_positioning);
+    MENU_ITEM_EDIT_CALLBACK(float62, MSG_YSTEPS, &planner.axis_steps_per_mm[Y_AXIS], 5, 9999, _planner_refresh_positioning);
+    MENU_ITEM_EDIT_CALLBACK(float62, MSG_ZSTEPS, &planner.axis_steps_per_mm[Z_AXIS], 5, 9999, _planner_refresh_positioning);
+    MENU_ITEM_EDIT_CALLBACK(float62, MSG_ESTEPS, &planner.axis_steps_per_mm[E_AXIS], 5, 9999, _planner_refresh_positioning);
     #if ENABLED(ABORT_ON_ENDSTOP_HIT_FEATURE_ENABLED)
       MENU_ITEM_EDIT(bool, MSG_ENDSTOP_ABORT, &stepper.abort_on_endstop_hit);
     #endif
@@ -2422,6 +2432,7 @@ void kill_screen(const char* lcd_msg) {
   menu_edit_type(float, float5, ftostr5rj, 0.01)
   menu_edit_type(float, float51, ftostr51sign, 10)
   menu_edit_type(float, float52, ftostr52sign, 100)
+  menu_edit_type(float, float62, ftostr62sign, 100)
   menu_edit_type(unsigned long, long5, ftostr5rj, 0.01)
 
   /**
