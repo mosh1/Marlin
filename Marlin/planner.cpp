@@ -104,6 +104,11 @@ float Planner::min_feedrate_mm_s,
   matrix_3x3 Planner::bed_level_matrix; // Transform to compensate for bed level
 #endif
 
+#if ENABLED(ENABLE_LEVELING_FADE_HEIGHT)
+  float Planner::z_fade_height = 0.0,
+        Planner::inverse_z_fade_height = 0.0;
+#endif
+
 #if ENABLED(AUTOTEMP)
   float Planner::autotemp_max = 250,
         Planner::autotemp_min = 210,
@@ -134,6 +139,10 @@ float Planner::previous_speed[NUM_AXIS],
 #if ENABLED(LIN_ADVANCE)
   float Planner::extruder_advance_k = LIN_ADVANCE_K;
   float Planner::position_float[NUM_AXIS] = { 0 };
+#endif
+
+#if ENABLED(ENSURE_SMOOTH_MOVES)
+  uint32_t Planner::block_buffer_runtime_us = 0;
 #endif
 
 /**
@@ -531,10 +540,24 @@ void Planner::check_axes_activity() {
       if (!abl_enabled) return;
     #endif
 
+    #if ENABLED(ENABLE_LEVELING_FADE_HEIGHT)
+      static float z_fade_factor = 1.0, last_raw_lz = -999.0;
+      if (z_fade_height) {
+        const float raw_lz = RAW_Z_POSITION(lz);
+        if (raw_lz >= z_fade_height) return;
+        if (last_raw_lz != raw_lz) {
+          last_raw_lz = raw_lz;
+          z_fade_factor = 1.0 - raw_lz * inverse_z_fade_height;
+        }
+      }
+      else
+        z_fade_factor = 1.0;
+    #endif
+
     #if ENABLED(MESH_BED_LEVELING)
 
       if (mbl.active())
-        lz += mbl.get_z(RAW_X_POSITION(lx), RAW_Y_POSITION(ly));
+        lz += mbl.get_z(RAW_X_POSITION(lx), RAW_Y_POSITION(ly)) * z_fade_factor;
 
     #elif ABL_PLANAR
 
@@ -551,7 +574,7 @@ void Planner::check_axes_activity() {
     #elif ENABLED(AUTO_BED_LEVELING_BILINEAR)
 
       float tmp[XYZ] = { lx, ly, 0 };
-      lz += bilinear_z_offset(tmp);
+      lz += bilinear_z_offset(tmp) * z_fade_factor;
 
     #endif
   }
@@ -562,10 +585,20 @@ void Planner::check_axes_activity() {
       if (!abl_enabled) return;
     #endif
 
+    #if ENABLED(ENABLE_LEVELING_FADE_HEIGHT)
+      if (z_fade_height && RAW_Z_POSITION(logical[Z_AXIS]) >= z_fade_height) return;
+    #endif
+
     #if ENABLED(MESH_BED_LEVELING)
 
-      if (mbl.active())
-        logical[Z_AXIS] -= mbl.get_z(RAW_X_POSITION(logical[X_AXIS]), RAW_Y_POSITION(logical[Y_AXIS]));
+      if (mbl.active()) {
+        #if ENABLED(ENABLE_LEVELING_FADE_HEIGHT)
+          const float c = mbl.get_z(RAW_X_POSITION(logical[X_AXIS]), RAW_Y_POSITION(logical[Y_AXIS]));
+          logical[Z_AXIS] = (z_fade_height * (RAW_Z_POSITION(logical[Z_AXIS]) - c)) / (z_fade_height - c);
+        #else
+          logical[Z_AXIS] -= mbl.get_z(RAW_X_POSITION(logical[X_AXIS]), RAW_Y_POSITION(logical[Y_AXIS]));
+        #endif
+      }
 
     #elif ABL_PLANAR
 
@@ -583,7 +616,12 @@ void Planner::check_axes_activity() {
 
     #elif ENABLED(AUTO_BED_LEVELING_BILINEAR)
 
-      logical[Z_AXIS] -= bilinear_z_offset(logical);
+      #if ENABLED(ENABLE_LEVELING_FADE_HEIGHT)
+        const float c = bilinear_z_offset(logical);
+        logical[Z_AXIS] = (z_fade_height * (RAW_Z_POSITION(logical[Z_AXIS]) - c)) / (z_fade_height - c);
+      #else
+        logical[Z_AXIS] -= bilinear_z_offset(logical);
+      #endif
 
     #endif
   }
@@ -674,24 +712,24 @@ void Planner::_buffer_line(const float &a, const float &b, const float &c, const
 
   // Compute direction bit-mask for this block
   uint8_t dm = 0;
-  #if ENABLED(COREXY)
-    if (da < 0) SBI(dm, X_HEAD); // Save the real Extruder (head) direction in X Axis
-    if (db < 0) SBI(dm, Y_HEAD); // ...and Y
+  #if CORE_IS_XY
+    if (da < 0) SBI(dm, X_HEAD);                // Save the real Extruder (head) direction in X Axis
+    if (db < 0) SBI(dm, Y_HEAD);                // ...and Y
     if (dc < 0) SBI(dm, Z_AXIS);
-    if (da + db < 0) SBI(dm, A_AXIS); // Motor A direction
-    if (da - db < 0) SBI(dm, B_AXIS); // Motor B direction
-  #elif ENABLED(COREXZ)
-    if (da < 0) SBI(dm, X_HEAD); // Save the real Extruder (head) direction in X Axis
+    if (da + db < 0) SBI(dm, A_AXIS);           // Motor A direction
+    if (CORESIGN(da - db) < 0) SBI(dm, B_AXIS); // Motor B direction
+  #elif CORE_IS_XZ
+    if (da < 0) SBI(dm, X_HEAD);                // Save the real Extruder (head) direction in X Axis
     if (db < 0) SBI(dm, Y_AXIS);
-    if (dc < 0) SBI(dm, Z_HEAD); // ...and Z
-    if (da + dc < 0) SBI(dm, A_AXIS); // Motor A direction
-    if (da - dc < 0) SBI(dm, C_AXIS); // Motor C direction
-  #elif ENABLED(COREYZ)
+    if (dc < 0) SBI(dm, Z_HEAD);                // ...and Z
+    if (da + dc < 0) SBI(dm, A_AXIS);           // Motor A direction
+    if (CORESIGN(da - dc) < 0) SBI(dm, C_AXIS); // Motor C direction
+  #elif CORE_IS_YZ
     if (da < 0) SBI(dm, X_AXIS);
-    if (db < 0) SBI(dm, Y_HEAD); // Save the real Extruder (head) direction in Y Axis
-    if (dc < 0) SBI(dm, Z_HEAD); // ...and Z
-    if (db + dc < 0) SBI(dm, B_AXIS); // Motor B direction
-    if (db - dc < 0) SBI(dm, C_AXIS); // Motor C direction
+    if (db < 0) SBI(dm, Y_HEAD);                // Save the real Extruder (head) direction in Y Axis
+    if (dc < 0) SBI(dm, Z_HEAD);                // ...and Z
+    if (db + dc < 0) SBI(dm, B_AXIS);           // Motor B direction
+    if (CORESIGN(db - dc) < 0) SBI(dm, C_AXIS); // Motor C direction
   #else
     if (da < 0) SBI(dm, X_AXIS);
     if (db < 0) SBI(dm, Y_AXIS);
@@ -719,19 +757,16 @@ void Planner::_buffer_line(const float &a, const float &b, const float &c, const
   block->direction_bits = dm;
 
   // Number of steps for each axis
-  #if ENABLED(COREXY)
-    // corexy planning
-    // these equations follow the form of the dA and dB equations on http://www.corexy.com/theory.html
+  // See http://www.corexy.com/theory.html
+  #if CORE_IS_XY
     block->steps[A_AXIS] = labs(da + db);
     block->steps[B_AXIS] = labs(da - db);
     block->steps[Z_AXIS] = labs(dc);
-  #elif ENABLED(COREXZ)
-    // corexz planning
+  #elif CORE_IS_XZ
     block->steps[A_AXIS] = labs(da + dc);
     block->steps[Y_AXIS] = labs(db);
     block->steps[C_AXIS] = labs(da - dc);
-  #elif ENABLED(COREYZ)
-    // coreyz planning
+  #elif CORE_IS_YZ
     block->steps[X_AXIS] = labs(da);
     block->steps[B_AXIS] = labs(db + dc);
     block->steps[C_AXIS] = labs(db - dc);
@@ -766,7 +801,7 @@ void Planner::_buffer_line(const float &a, const float &b, const float &c, const
   block->active_extruder = extruder;
 
   //enable active axes
-  #if ENABLED(COREXY)
+  #if CORE_IS_XY
     if (block->steps[A_AXIS] || block->steps[B_AXIS]) {
       enable_x();
       enable_y();
@@ -774,13 +809,13 @@ void Planner::_buffer_line(const float &a, const float &b, const float &c, const
     #if DISABLED(Z_LATE_ENABLE)
       if (block->steps[Z_AXIS]) enable_z();
     #endif
-  #elif ENABLED(COREXZ)
+  #elif CORE_IS_XZ
     if (block->steps[A_AXIS] || block->steps[C_AXIS]) {
       enable_x();
       enable_z();
     }
     if (block->steps[Y_AXIS]) enable_y();
-  #elif ENABLED(COREYZ)
+  #elif CORE_IS_YZ
     if (block->steps[B_AXIS] || block->steps[C_AXIS]) {
       enable_y();
       enable_z();
@@ -877,26 +912,26 @@ void Planner::_buffer_line(const float &a, const float &b, const float &c, const
    * So we need to create other 2 "AXIS", named X_HEAD and Y_HEAD, meaning the real displacement of the Head.
    * Having the real displacement of the head, we can calculate the total movement length and apply the desired speed.
    */
-  #if ENABLED(COREXY) || ENABLED(COREXZ) || ENABLED(COREYZ)
+  #if IS_CORE
     float delta_mm[7];
-    #if ENABLED(COREXY)
+    #if CORE_IS_XY
       delta_mm[X_HEAD] = da * steps_to_mm[A_AXIS];
       delta_mm[Y_HEAD] = db * steps_to_mm[B_AXIS];
       delta_mm[Z_AXIS] = dc * steps_to_mm[Z_AXIS];
       delta_mm[A_AXIS] = (da + db) * steps_to_mm[A_AXIS];
-      delta_mm[B_AXIS] = (da - db) * steps_to_mm[B_AXIS];
-    #elif ENABLED(COREXZ)
+      delta_mm[B_AXIS] = CORESIGN(da - db) * steps_to_mm[B_AXIS];
+    #elif CORE_IS_XZ
       delta_mm[X_HEAD] = da * steps_to_mm[A_AXIS];
       delta_mm[Y_AXIS] = db * steps_to_mm[Y_AXIS];
       delta_mm[Z_HEAD] = dc * steps_to_mm[C_AXIS];
       delta_mm[A_AXIS] = (da + dc) * steps_to_mm[A_AXIS];
-      delta_mm[C_AXIS] = (da - dc) * steps_to_mm[C_AXIS];
-    #elif ENABLED(COREYZ)
+      delta_mm[C_AXIS] = CORESIGN(da - dc) * steps_to_mm[C_AXIS];
+    #elif CORE_IS_YZ
       delta_mm[X_AXIS] = da * steps_to_mm[X_AXIS];
       delta_mm[Y_HEAD] = db * steps_to_mm[B_AXIS];
       delta_mm[Z_HEAD] = dc * steps_to_mm[C_AXIS];
       delta_mm[B_AXIS] = (db + dc) * steps_to_mm[B_AXIS];
-      delta_mm[C_AXIS] = (db - dc) * steps_to_mm[C_AXIS];
+      delta_mm[C_AXIS] = CORESIGN(db - dc) * steps_to_mm[C_AXIS];
     #endif
   #else
     float delta_mm[4];
@@ -911,11 +946,11 @@ void Planner::_buffer_line(const float &a, const float &b, const float &c, const
   }
   else {
     block->millimeters = sqrt(
-      #if ENABLED(COREXY)
+      #if CORE_IS_XY
         sq(delta_mm[X_HEAD]) + sq(delta_mm[Y_HEAD]) + sq(delta_mm[Z_AXIS])
-      #elif ENABLED(COREXZ)
+      #elif CORE_IS_XZ
         sq(delta_mm[X_HEAD]) + sq(delta_mm[Y_AXIS]) + sq(delta_mm[Z_HEAD])
-      #elif ENABLED(COREYZ)
+      #elif CORE_IS_YZ
         sq(delta_mm[X_AXIS]) + sq(delta_mm[Y_HEAD]) + sq(delta_mm[Z_HEAD])
       #else
         sq(delta_mm[X_AXIS]) + sq(delta_mm[Y_AXIS]) + sq(delta_mm[Z_AXIS])
@@ -954,6 +989,7 @@ void Planner::_buffer_line(const float &a, const float &b, const float &c, const
       segment_time = (MIN_BLOCK_TIME) * 1000UL;
     }
     block->segment_time = segment_time;
+    block_buffer_runtime_us += segment_time;
   #endif
 
   block->nominal_speed = block->millimeters * inverse_mm_s; // (mm/sec) Always > 0

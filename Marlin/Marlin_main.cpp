@@ -881,27 +881,6 @@ void setup_homepin(void) {
   #endif
 }
 
-#if HAS_CASE_LIGHT
-
-  void setup_case_light() {
-    digitalWrite(CASE_LIGHT_PIN,
-      #if ENABLED(CASE_LIGHT_DEFAULT_ON)
-        255
-      #else
-        0
-      #endif
-    );
-    analogWrite(CASE_LIGHT_PIN,
-      #if ENABLED(CASE_LIGHT_DEFAULT_ON)
-        255
-      #else
-        0
-      #endif
-    );
-  }
-
-#endif
-
 void setup_powerhold() {
   #if HAS_SUICIDE
     OUT_WRITE(SUICIDE_PIN, HIGH);
@@ -2270,6 +2249,30 @@ static void clean_up_after_endstop_or_probe_move() {
     #endif
   }
 
+  #if ENABLED(ENABLE_LEVELING_FADE_HEIGHT)
+
+    void set_z_fade_height(const float zfh) {
+      planner.z_fade_height = zfh;
+      planner.inverse_z_fade_height = RECIPROCAL(zfh);
+
+      if (
+        #if ENABLED(MESH_BED_LEVELING)
+          mbl.active()
+        #else
+          planner.abl_enabled
+        #endif
+      ) {
+        set_current_from_steppers_for_axis(
+          #if ABL_PLANAR
+            ALL_AXES
+          #else
+            Z_AXIS
+          #endif
+        );
+      }
+    }
+
+  #endif // LEVELING_FADE_HEIGHT
 
   /**
    * Reset calibration results to zero.
@@ -3075,7 +3078,7 @@ inline void gcode_G4() {
       SERIAL_ECHOLNPGM("Delta");
     #elif IS_SCARA
       SERIAL_ECHOLNPGM("SCARA");
-    #elif ENABLED(COREXY) || ENABLED(COREXZ) || ENABLED(COREYZ)
+    #elif IS_CORE
       SERIAL_ECHOLNPGM("Core");
     #else
       SERIAL_ECHOLNPGM("Cartesian");
@@ -5836,7 +5839,7 @@ inline void gcode_M115() {
 
     // PROGRESS (M530 S L, M531 <file>, M532 X L)
     SERIAL_PROTOCOLPGM("Cap:");
-    SERIAL_PROTOCOLPGM("PROGRESS:0");
+    SERIAL_PROTOCOLLNPGM("PROGRESS:0");
 
     // AUTOLEVEL (G29)
     SERIAL_PROTOCOLPGM("Cap:");
@@ -6788,9 +6791,17 @@ void quickstop_stepper() {
 
 #if PLANNER_LEVELING
   /**
-   * M420: Enable/Disable Bed Leveling
+   * M420: Enable/Disable Bed Leveling and/or set the Z fade height.
+   *
+   *       S[bool]   Turns leveling on or off
+   *       Z[height] Sets the Z fade height (0 or none to disable)
    */
-  inline void gcode_M420() { if (code_seen('S')) set_bed_leveling_enabled(code_value_bool()); }
+  inline void gcode_M420() {
+    if (code_seen('S')) set_bed_leveling_enabled(code_value_bool());
+    #if ENABLED(ENABLE_LEVELING_FADE_HEIGHT)
+      if (code_seen('Z')) set_z_fade_height(code_value_linear_units());
+    #endif
+  }
 #endif
 
 #if ENABLED(MESH_BED_LEVELING)
@@ -7279,6 +7290,13 @@ inline void gcode_M907() {
 
 #if HAS_CASE_LIGHT
 
+  uint8_t case_light_brightness = 255;
+
+  void update_case_light() {
+    digitalWrite(CASE_LIGHT_PIN, case_light_on ? HIGH : LOW);
+    analogWrite(CASE_LIGHT_PIN, case_light_on ? case_light_brightness : 0);
+  }
+
   /**
    * M355: Turn case lights on/off and set brightness
    *
@@ -7286,13 +7304,9 @@ inline void gcode_M907() {
    *   P<byte>  Set case light brightness (PWM pin required)
    */
   inline void gcode_M355() {
-    static uint8_t case_light_brightness = 255;
     if (code_seen('P')) case_light_brightness = code_value_byte();
-    if (code_seen('S')) {
-      case_light_on = code_value_bool();
-      digitalWrite(CASE_LIGHT_PIN, case_light_on ? HIGH : LOW);
-      analogWrite(CASE_LIGHT_PIN, case_light_on ? case_light_brightness : 0);
-    }
+    if (code_seen('S')) case_light_on = code_value_bool();
+    update_case_light();
     SERIAL_ECHO_START;
     SERIAL_ECHOPGM("Case lights ");
     case_light_on ? SERIAL_ECHOLNPGM("on") : SERIAL_ECHOLNPGM("off");
@@ -10020,7 +10034,7 @@ void setup() {
   #endif
 
   #if HAS_CASE_LIGHT
-    setup_case_light();
+    update_case_light();
   #endif
 
   #if HAS_BED_PROBE
