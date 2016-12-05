@@ -1227,7 +1227,7 @@ inline bool code_value_bool() { return !code_has_value() || code_value_byte() > 
   }
 
   inline float axis_unit_factor(int axis) {
-    return (axis == E_AXIS && volumetric_enabled ? volumetric_unit_factor : linear_unit_factor);
+    return (axis >= E_AXIS && volumetric_enabled ? volumetric_unit_factor : linear_unit_factor);
   }
 
   inline float code_value_linear_units() { return code_value_float() * linear_unit_factor; }
@@ -1312,22 +1312,20 @@ bool get_target_extruder_from_command(int code) {
 
   static DualXMode dual_x_carriage_mode = DEFAULT_DUAL_X_CARRIAGE_MODE;
 
-  static float x_home_pos(int extruder) {
+  static float x_home_pos(const int extruder) {
     if (extruder == 0)
       return LOGICAL_X_POSITION(base_home_pos(X_AXIS));
     else
       /**
        * In dual carriage mode the extruder offset provides an override of the
-       * second X-carriage offset when homed - otherwise X2_HOME_POS is used.
-       * This allow soft recalibration of the second extruder offset position
+       * second X-carriage position when homed - otherwise X2_HOME_POS is used.
+       * This allows soft recalibration of the second extruder home position
        * without firmware reflash (through the M218 command).
        */
-      return (hotend_offset[X_AXIS][1] > 0) ? hotend_offset[X_AXIS][1] : X2_HOME_POS;
+      return LOGICAL_X_POSITION(hotend_offset[X_AXIS][1] > 0 ? hotend_offset[X_AXIS][1] : X2_HOME_POS);
   }
 
-  static int x_home_dir(int extruder) {
-    return (extruder == 0) ? X_HOME_DIR : X2_HOME_DIR;
-  }
+  static int x_home_dir(const int extruder) { return extruder ? X2_HOME_DIR : X_HOME_DIR; }
 
   static float inactive_extruder_x_pos = X2_MAX_POS; // used in mode 0 & 1
   static bool active_extruder_parked = false;        // used in mode 1 & 2
@@ -1351,25 +1349,33 @@ void update_software_endstops(AxisEnum axis) {
   float offs = LOGICAL_POSITION(0, axis);
 
   #if ENABLED(DUAL_X_CARRIAGE)
+    bool did_update = false;
     if (axis == X_AXIS) {
+
+      // In Dual X mode hotend_offset[X] is T1's home position
       float dual_max_x = max(hotend_offset[X_AXIS][1], X2_MAX_POS);
+
       if (active_extruder != 0) {
+        // T1 can move from X2_MIN_POS to X2_MAX_POS or X2 home position (whichever is larger)
         soft_endstop_min[X_AXIS] = X2_MIN_POS + offs;
         soft_endstop_max[X_AXIS] = dual_max_x + offs;
-        return;
       }
       else if (dual_x_carriage_mode == DXC_DUPLICATION_MODE) {
+        // In Duplication Mode, T0 can move as far left as X_MIN_POS
+        // but not so far to the right that T1 would move past the end
         soft_endstop_min[X_AXIS] = base_min_pos(X_AXIS) + offs;
         soft_endstop_max[X_AXIS] = min(base_max_pos(X_AXIS), dual_max_x - duplicate_extruder_x_offset) + offs;
-        return;
+      }
+      else {
+        // In other modes, T0 can move from X_MIN_POS to X_MAX_POS
+        soft_endstop_min[axis] = base_min_pos(axis) + offs;
+        soft_endstop_max[axis] = base_max_pos(axis) + offs;
       }
     }
-    else
-  #endif
-  {
+  #else
     soft_endstop_min[axis] = base_min_pos(axis) + offs;
     soft_endstop_max[axis] = base_max_pos(axis) + offs;
-  }
+  #endif
 
   #if ENABLED(DEBUG_LEVELING_FEATURE)
     if (DEBUGGING(LEVELING)) {
@@ -1418,6 +1424,7 @@ static void set_home_offset(AxisEnum axis, float v) {
  * current_position to home, because neither X nor Y is at home until
  * both are at home. Z can however be homed individually.
  *
+ * Callers must sync the planner position after calling this!
  */
 static void set_axis_is_at_home(AxisEnum axis) {
   #if ENABLED(DEBUG_LEVELING_FEATURE)
@@ -1434,12 +1441,8 @@ static void set_axis_is_at_home(AxisEnum axis) {
   update_software_endstops(axis);
 
   #if ENABLED(DUAL_X_CARRIAGE)
-    if (axis == X_AXIS && (active_extruder != 0 || dual_x_carriage_mode == DXC_DUPLICATION_MODE)) {
-      if (active_extruder != 0)
-        current_position[X_AXIS] = x_home_pos(active_extruder);
-      else
-        current_position[X_AXIS] = LOGICAL_X_POSITION(base_home_pos(X_AXIS));
-      update_software_endstops(X_AXIS);
+    if (axis == X_AXIS && (active_extruder == 1 || dual_x_carriage_mode == DXC_DUPLICATION_MODE)) {
+      current_position[X_AXIS] = x_home_pos(active_extruder);
       return;
     }
   #endif
@@ -2224,11 +2227,15 @@ static void clean_up_after_endstop_or_probe_move() {
   void set_bed_leveling_enabled(bool enable=true) {
     #if ENABLED(MESH_BED_LEVELING)
 
-      if (!enable && mbl.active())
-        current_position[Z_AXIS] +=
-          mbl.get_z(RAW_CURRENT_POSITION(X_AXIS), RAW_CURRENT_POSITION(Y_AXIS)) - (MESH_HOME_SEARCH_Z);
+      if (enable != mbl.active()) {
 
-      mbl.set_active(enable && mbl.has_mesh()); // was set_has_mesh(). Is this not correct?
+        if (!enable)
+          planner.apply_leveling(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS]);
+
+        mbl.set_active(enable && mbl.has_mesh());
+
+        if (enable) planner.unapply_leveling(current_position);
+      }
 
     #elif HAS_ABL
 
@@ -3162,8 +3169,10 @@ inline void gcode_G4() {
     #elif ENABLED(MESH_BED_LEVELING)
       SERIAL_ECHOPGM("Mesh Bed Leveling");
       if (mbl.active()) {
+        float lz = current_position[Z_AXIS];
+        planner.apply_leveling(current_position[X_AXIS], current_position[Y_AXIS], lz);
         SERIAL_ECHOLNPGM(" (enabled)");
-        SERIAL_ECHOPAIR("MBL Adjustment Z", mbl.get_z(RAW_CURRENT_POSITION(X_AXIS), RAW_CURRENT_POSITION(Y_AXIS)));
+        SERIAL_ECHOPAIR("MBL Adjustment Z", lz);
       }
       SERIAL_EOL;
     #endif
@@ -3246,13 +3255,21 @@ inline void gcode_G4() {
           #endif
         )
     ) {
+
       #if HOMING_Z_WITH_PROBE
         destination[X_AXIS] -= X_PROBE_OFFSET_FROM_EXTRUDER;
         destination[Y_AXIS] -= Y_PROBE_OFFSET_FROM_EXTRUDER;
       #endif
+
       #if ENABLED(DEBUG_LEVELING_FEATURE)
         if (DEBUGGING(LEVELING)) DEBUG_POS("Z_SAFE_HOMING", destination);
       #endif
+
+      // This causes the carriage on Dual X to unpark
+      #if ENABLED(DUAL_X_CARRIAGE)
+        active_extruder_parked = false;
+      #endif
+
       do_blocking_move_to_xy(destination[X_AXIS], destination[Y_AXIS]);
       HOMEAXIS(Z);
     }
@@ -3321,13 +3338,15 @@ inline void gcode_G28() {
       #if ENABLED(DEBUG_LEVELING_FEATURE)
         if (DEBUGGING(LEVELING)) SERIAL_ECHOLNPGM("MBL was active");
       #endif
-      // Save known Z position if already homed
+      // Use known Z position if already homed
       if (axis_homed[X_AXIS] && axis_homed[Y_AXIS] && axis_homed[Z_AXIS]) {
+        set_bed_leveling_enabled(false);
         pre_home_z = current_position[Z_AXIS];
-        pre_home_z += mbl.get_z(RAW_CURRENT_POSITION(X_AXIS), RAW_CURRENT_POSITION(Y_AXIS));
       }
-      mbl.set_active(false);
-      current_position[Z_AXIS] = pre_home_z;
+      else {
+        mbl.set_active(false);
+        current_position[Z_AXIS] = pre_home_z;
+      }
       #if ENABLED(DEBUG_LEVELING_FEATURE)
         if (DEBUGGING(LEVELING)) DEBUG_POS("Set Z to pre_home_z", current_position);
       #endif
@@ -3399,20 +3418,31 @@ inline void gcode_G28() {
 
     // Home X
     if (home_all_axis || homeX) {
+
       #if ENABLED(DUAL_X_CARRIAGE)
-        int tmp_extruder = active_extruder;
-        active_extruder = !active_extruder;
+
+        // Always home the 2nd (right) extruder first
+        active_extruder = 1;
         HOMEAXIS(X);
+
+        // Remember this extruder's position for later tool change
         inactive_extruder_x_pos = RAW_X_POSITION(current_position[X_AXIS]);
-        active_extruder = tmp_extruder;
+
+        // Home the 1st (left) extruder
+        active_extruder = 0;
         HOMEAXIS(X);
-        // reset state used by the different modes
+
+        // Consider the active extruder to be parked
         memcpy(raised_parked_position, current_position, sizeof(raised_parked_position));
         delayed_move_time = 0;
         active_extruder_parked = true;
+
       #else
+
         HOMEAXIS(X);
+
       #endif
+
       #if ENABLED(DEBUG_LEVELING_FEATURE)
         if (DEBUGGING(LEVELING)) DEBUG_POS("> homeX", current_position);
       #endif
@@ -3551,6 +3581,9 @@ inline void gcode_G28() {
     stepper.synchronize();
   }
 
+  // Save 130 bytes with non-duplication of PSTR
+  void say_not_entered() { SERIAL_PROTOCOLLNPGM(" not entered."); }
+
   /**
    * G29: Mesh-based Z probe, probes a grid and produces a
    *      mesh to compensate for variable bed height
@@ -3663,7 +3696,7 @@ inline void gcode_G28() {
           }
         }
         else {
-          SERIAL_CHAR('X'); SERIAL_PROTOCOLLNPGM(" not entered.");
+          SERIAL_CHAR('X'); say_not_entered();
           return;
         }
 
@@ -3675,7 +3708,7 @@ inline void gcode_G28() {
           }
         }
         else {
-          SERIAL_CHAR('Y'); SERIAL_PROTOCOLLNPGM(" not entered.");
+          SERIAL_CHAR('Y'); say_not_entered();
           return;
         }
 
@@ -3683,7 +3716,7 @@ inline void gcode_G28() {
           mbl.z_values[py][px] = code_value_axis_units(Z_AXIS);
         }
         else {
-          SERIAL_CHAR('Z'); SERIAL_PROTOCOLLNPGM(" not entered.");
+          SERIAL_CHAR('Z'); say_not_entered();
           return;
         }
         break;
@@ -3693,15 +3726,15 @@ inline void gcode_G28() {
           mbl.z_offset = code_value_axis_units(Z_AXIS);
         }
         else {
-          SERIAL_CHAR('Z'); SERIAL_PROTOCOLLNPGM(" not entered.");
+          SERIAL_CHAR('Z'); say_not_entered();
           return;
         }
         break;
 
       case MeshReset:
         if (mbl.active()) {
-          current_position[Z_AXIS] +=
-            mbl.get_z(RAW_CURRENT_POSITION(X_AXIS), RAW_CURRENT_POSITION(Y_AXIS)) - MESH_HOME_SEARCH_Z;
+          current_position[Z_AXIS] -= MESH_HOME_SEARCH_Z;
+          planner.apply_leveling(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS]);
           mbl.reset();
           SYNC_PLAN_POSITION_KINEMATIC();
         }
@@ -5762,21 +5795,37 @@ inline void gcode_M85() {
 }
 
 /**
+ * Multi-stepper support for M92, M201, M203
+ */
+#if ENABLED(DISTINCT_E_FACTORS)
+  #define GET_TARGET_EXTRUDER(CMD) if (get_target_extruder_from_command(CMD)) return
+  #define TARGET_EXTRUDER target_extruder
+#else
+  #define GET_TARGET_EXTRUDER(CMD) NOOP
+  #define TARGET_EXTRUDER 0
+#endif
+
+/**
  * M92: Set axis steps-per-unit for one or more axes, X, Y, Z, and E.
  *      (Follows the same syntax as G92)
+ *
+ *      With multiple extruders use T to specify which one.
  */
 inline void gcode_M92() {
+
+  GET_TARGET_EXTRUDER(92);
+
   LOOP_XYZE(i) {
     if (code_seen(axis_codes[i])) {
       if (i == E_AXIS) {
-        float value = code_value_per_axis_unit(i);
+        float value = code_value_per_axis_unit(E_AXIS + TARGET_EXTRUDER);
         if (value < 20.0) {
-          float factor = planner.axis_steps_per_mm[i] / value; // increase e constants if M92 E14 is given for netfab.
+          float factor = planner.axis_steps_per_mm[E_AXIS + TARGET_EXTRUDER] / value; // increase e constants if M92 E14 is given for netfab.
           planner.max_jerk[E_AXIS] *= factor;
-          planner.max_feedrate_mm_s[E_AXIS] *= factor;
-          planner.max_acceleration_steps_per_s2[E_AXIS] *= factor;
+          planner.max_feedrate_mm_s[E_AXIS + TARGET_EXTRUDER] *= factor;
+          planner.max_acceleration_steps_per_s2[E_AXIS + TARGET_EXTRUDER] *= factor;
         }
-        planner.axis_steps_per_mm[E_AXIS] = value;
+        planner.axis_steps_per_mm[E_AXIS + TARGET_EXTRUDER] = value;
       }
       else {
         planner.axis_steps_per_mm[i] = code_value_per_axis_unit(i);
@@ -5822,63 +5871,55 @@ inline void gcode_M115() {
   #if ENABLED(EXTENDED_CAPABILITIES_REPORT)
 
     // EEPROM (M500, M501)
-    SERIAL_PROTOCOLPGM("Cap:");
     #if ENABLED(EEPROM_SETTINGS)
-      SERIAL_PROTOCOLLNPGM("EEPROM:1");
+      SERIAL_PROTOCOLLNPGM("Cap:EEPROM:1");
     #else
-      SERIAL_PROTOCOLLNPGM("EEPROM:0");
+      SERIAL_PROTOCOLLNPGM("Cap:EEPROM:0");
     #endif
 
     // AUTOREPORT_TEMP (M155)
-    SERIAL_PROTOCOLPGM("Cap:");
     #if ENABLED(AUTO_REPORT_TEMPERATURES)
-      SERIAL_PROTOCOLLNPGM("AUTOREPORT_TEMP:1");
+      SERIAL_PROTOCOLLNPGM("Cap:AUTOREPORT_TEMP:1");
     #else
-      SERIAL_PROTOCOLLNPGM("AUTOREPORT_TEMP:0");
+      SERIAL_PROTOCOLLNPGM("Cap:AUTOREPORT_TEMP:0");
     #endif
 
     // PROGRESS (M530 S L, M531 <file>, M532 X L)
-    SERIAL_PROTOCOLPGM("Cap:");
-    SERIAL_PROTOCOLLNPGM("PROGRESS:0");
+    SERIAL_PROTOCOLLNPGM("Cap:PROGRESS:0");
 
     // AUTOLEVEL (G29)
-    SERIAL_PROTOCOLPGM("Cap:");
     #if HAS_ABL
-      SERIAL_PROTOCOLLNPGM("AUTOLEVEL:1");
+      SERIAL_PROTOCOLLNPGM("Cap:AUTOLEVEL:1");
     #else
-      SERIAL_PROTOCOLLNPGM("AUTOLEVEL:0");
+      SERIAL_PROTOCOLLNPGM("Cap:AUTOLEVEL:0");
     #endif
 
     // Z_PROBE (G30)
-    SERIAL_PROTOCOLPGM("Cap:");
     #if HAS_BED_PROBE
-      SERIAL_PROTOCOLLNPGM("Z_PROBE:1");
+      SERIAL_PROTOCOLLNPGM("Cap:Z_PROBE:1");
     #else
-      SERIAL_PROTOCOLLNPGM("Z_PROBE:0");
+      SERIAL_PROTOCOLLNPGM("Cap:Z_PROBE:0");
     #endif
 
     // SOFTWARE_POWER (G30)
-    SERIAL_PROTOCOLPGM("Cap:");
     #if HAS_POWER_SWITCH
-      SERIAL_PROTOCOLLNPGM("SOFTWARE_POWER:1");
+      SERIAL_PROTOCOLLNPGM("Cap:SOFTWARE_POWER:1");
     #else
-      SERIAL_PROTOCOLLNPGM("SOFTWARE_POWER:0");
+      SERIAL_PROTOCOLLNPGM("Cap:SOFTWARE_POWER:0");
     #endif
 
     // TOGGLE_LIGHTS (M355)
-    SERIAL_PROTOCOLPGM("Cap:");
     #if HAS_CASE_LIGHT
-      SERIAL_PROTOCOLLNPGM("TOGGLE_LIGHTS:1");
+      SERIAL_PROTOCOLLNPGM("Cap:TOGGLE_LIGHTS:1");
     #else
-      SERIAL_PROTOCOLLNPGM("TOGGLE_LIGHTS:0");
+      SERIAL_PROTOCOLLNPGM("Cap:TOGGLE_LIGHTS:0");
     #endif
 
     // EMERGENCY_PARSER (M108, M112, M410)
-    SERIAL_PROTOCOLPGM("Cap:");
     #if ENABLED(EMERGENCY_PARSER)
-      SERIAL_PROTOCOLLNPGM("EMERGENCY_PARSER:1");
+      SERIAL_PROTOCOLLNPGM("Cap:EMERGENCY_PARSER:1");
     #else
-      SERIAL_PROTOCOLLNPGM("EMERGENCY_PARSER:0");
+      SERIAL_PROTOCOLLNPGM("Cap:EMERGENCY_PARSER:0");
     #endif
 
   #endif // EXTENDED_CAPABILITIES_REPORT
@@ -5965,11 +6006,7 @@ inline void gcode_M121() { endstops.enable_globally(false); }
     #if ENABLED(BLINKM)
 
       // This variant uses i2c to send the RGB components to the device.
-      SendColors(
-        code_seen('R') ? code_value_byte() : 0,
-        code_seen('U') ? code_value_byte() : 0,
-        code_seen('B') ? code_value_byte() : 0
-      );
+      SendColors(r, g, b);
 
     #else
 
@@ -6039,11 +6076,17 @@ inline void gcode_M200() {
 
 /**
  * M201: Set max acceleration in units/s^2 for print moves (M201 X1000 Y1000)
+ *
+ *       With multiple extruders use T to specify which one.
  */
 inline void gcode_M201() {
+
+  GET_TARGET_EXTRUDER(201);
+
   LOOP_XYZE(i) {
     if (code_seen(axis_codes[i])) {
-      planner.max_acceleration_mm_per_s2[i] = code_value_axis_units(i);
+      const uint8_t a = i + (i == E_AXIS ? TARGET_EXTRUDER : 0);
+      planner.max_acceleration_mm_per_s2[a] = code_value_axis_units(a);
     }
   }
   // steps per sq second need to be updated to agree with the units per sq second (as they are what is used in the planner)
@@ -6061,11 +6104,18 @@ inline void gcode_M201() {
 
 /**
  * M203: Set maximum feedrate that your machine can sustain (M203 X200 Y200 Z300 E10000) in units/sec
+ *
+ *       With multiple extruders use T to specify which one.
  */
 inline void gcode_M203() {
+
+  GET_TARGET_EXTRUDER(203);
+
   LOOP_XYZE(i)
-    if (code_seen(axis_codes[i]))
-      planner.max_feedrate_mm_s[i] = code_value_axis_units(i);
+    if (code_seen(axis_codes[i])) {
+      const uint8_t a = i + (i == E_AXIS ? TARGET_EXTRUDER : 0);
+      planner.max_feedrate_mm_s[a] = code_value_axis_units(a);
+    }
 }
 
 /**
@@ -7447,10 +7497,8 @@ inline void invalid_extruder_error(const uint8_t &e) {
 void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool no_move/*=false*/) {
   #if ENABLED(MIXING_EXTRUDER) && MIXING_VIRTUAL_TOOLS > 1
 
-    if (tmp_extruder >= MIXING_VIRTUAL_TOOLS) {
-      invalid_extruder_error(tmp_extruder);
-      return;
-    }
+    if (tmp_extruder >= MIXING_VIRTUAL_TOOLS)
+      return invalid_extruder_error(tmp_extruder);
 
     // T0-Tnnn: Switch virtual tool by changing the mix
     for (uint8_t j = 0; j < MIXING_STEPPERS; j++)
@@ -7460,10 +7508,8 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
 
     #if HOTENDS > 1
 
-      if (tmp_extruder >= EXTRUDERS) {
-        invalid_extruder_error(tmp_extruder);
-        return;
-      }
+      if (tmp_extruder >= EXTRUDERS)
+        return invalid_extruder_error(tmp_extruder);
 
       float old_feedrate_mm_s = feedrate_mm_s;
 
@@ -7491,22 +7537,28 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
             }
           #endif
 
-          if (dual_x_carriage_mode == DXC_AUTO_PARK_MODE && IsRunning() &&
-              (delayed_move_time || current_position[X_AXIS] != x_home_pos(active_extruder))
+          const float xhome = x_home_pos(active_extruder);
+          if (dual_x_carriage_mode == DXC_AUTO_PARK_MODE
+              && IsRunning()
+              && (delayed_move_time || current_position[X_AXIS] != xhome)
           ) {
+            float raised_z = current_position[Z_AXIS] + TOOLCHANGE_PARK_ZLIFT;
+            #if ENABLED(max_software_endstops)
+              NOMORE(raised_z, soft_endstop_max[Z_AXIS]);
+            #endif
             #if ENABLED(DEBUG_LEVELING_FEATURE)
               if (DEBUGGING(LEVELING)) {
-                SERIAL_ECHOPAIR("Raise to ", current_position[Z_AXIS] + TOOLCHANGE_PARK_ZLIFT); SERIAL_EOL;
-                SERIAL_ECHOPAIR("MoveX to ", x_home_pos(active_extruder)); SERIAL_EOL;
-                SERIAL_ECHOPAIR("Lower to ", current_position[Z_AXIS]); SERIAL_EOL;
+                SERIAL_ECHOLNPAIR("Raise to ", raised_z);
+                SERIAL_ECHOLNPAIR("MoveX to ", xhome);
+                SERIAL_ECHOLNPAIR("Lower to ", current_position[Z_AXIS]);
               }
             #endif
             // Park old head: 1) raise 2) move to park position 3) lower
             for (uint8_t i = 0; i < 3; i++)
               planner.buffer_line(
-                i == 0 ? current_position[X_AXIS] : x_home_pos(active_extruder),
+                i == 0 ? current_position[X_AXIS] : xhome,
                 current_position[Y_AXIS],
-                current_position[Z_AXIS] + (i == 2 ? 0 : TOOLCHANGE_PARK_ZLIFT),
+                i == 2 ? current_position[Z_AXIS] : raised_z,
                 current_position[E_AXIS],
                 planner.max_feedrate_mm_s[i == 1 ? X_AXIS : Z_AXIS],
                 active_extruder
@@ -7514,9 +7566,11 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
             stepper.synchronize();
           }
 
-          // apply Y & Z extruder offset (x offset is already used in determining home pos)
+          // Apply Y & Z extruder offset (X offset is used as home pos with Dual X)
           current_position[Y_AXIS] -= hotend_offset[Y_AXIS][active_extruder] - hotend_offset[Y_AXIS][tmp_extruder];
           current_position[Z_AXIS] -= hotend_offset[Z_AXIS][active_extruder] - hotend_offset[Z_AXIS][tmp_extruder];
+
+          // Activate the new extruder
           active_extruder = tmp_extruder;
 
           // This function resets the max/min values - the current position may be overwritten below.
@@ -7526,9 +7580,14 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
             if (DEBUGGING(LEVELING)) DEBUG_POS("New Extruder", current_position);
           #endif
 
+          // Only when auto-parking are carriages safe to move
+          if (dual_x_carriage_mode != DXC_AUTO_PARK_MODE) no_move = true;
+
           switch (dual_x_carriage_mode) {
             case DXC_FULL_CONTROL_MODE:
+              // New current position is the position of the activated extruder
               current_position[X_AXIS] = LOGICAL_X_POSITION(inactive_extruder_x_pos);
+              // Save the inactive extruder's position (from the old current_position)
               inactive_extruder_x_pos = RAW_X_POSITION(destination[X_AXIS]);
               break;
             case DXC_AUTO_PARK_MODE:
@@ -7542,7 +7601,10 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
               delayed_move_time = 0;
               break;
             case DXC_DUPLICATION_MODE:
-              active_extruder_parked = (active_extruder == 0); // this triggers the second extruder to move into the duplication position
+              // If the new extruder is the left one, set it "parked"
+              // This triggers the second extruder to move into the duplication position
+              active_extruder_parked = (active_extruder == 0);
+
               if (active_extruder_parked)
                 current_position[X_AXIS] = LOGICAL_X_POSITION(inactive_extruder_x_pos);
               else
@@ -7567,9 +7629,7 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
             float z_diff = hotend_offset[Z_AXIS][active_extruder] - hotend_offset[Z_AXIS][tmp_extruder],
                   z_raise = 0.3 + (z_diff > 0.0 ? z_diff : 0.0);
 
-            set_destination_to_current();
-
-            // Always raise by some amount
+            // Always raise by some amount (destination copied from current_position earlier)
             destination[Z_AXIS] += z_raise;
             planner.buffer_line_kinematic(destination, planner.max_feedrate_mm_s[Z_AXIS], active_extruder);
             stepper.synchronize();
@@ -7649,9 +7709,12 @@ void tool_change(const uint8_t tmp_extruder, const float fr_mm_s/*=0.0*/, bool n
                 #if ENABLED(DEBUG_LEVELING_FEATURE)
                   if (DEBUGGING(LEVELING)) SERIAL_ECHOPAIR("Z before MBL: ", current_position[Z_AXIS]);
                 #endif
-                float xpos = RAW_CURRENT_POSITION(X_AXIS),
-                      ypos = RAW_CURRENT_POSITION(Y_AXIS);
-                current_position[Z_AXIS] += mbl.get_z(xpos + xydiff[X_AXIS], ypos + xydiff[Y_AXIS]) - mbl.get_z(xpos, ypos);
+                float x2 = current_position[X_AXIS] + xydiff[X_AXIS],
+                      y2 = current_position[Y_AXIS] + xydiff[Y_AXIS],
+                      z1 = current_position[Z_AXIS], z2 = z1;
+                planner.apply_leveling(current_position[X_AXIS], current_position[Y_AXIS], z1);
+                planner.apply_leveling(x2, y2, z2);
+                current_position[Z_AXIS] += z2 - z1;
                 #if ENABLED(DEBUG_LEVELING_FEATURE)
                   if (DEBUGGING(LEVELING))
                     SERIAL_ECHOLNPAIR(" after: ", current_position[Z_AXIS]);
@@ -9221,23 +9284,6 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
       switch (dual_x_carriage_mode) {
         case DXC_FULL_CONTROL_MODE:
           break;
-        case DXC_DUPLICATION_MODE:
-          if (active_extruder == 0) {
-            // move duplicate extruder into correct duplication position.
-            planner.set_position_mm(
-              LOGICAL_X_POSITION(inactive_extruder_x_pos),
-              current_position[Y_AXIS],
-              current_position[Z_AXIS],
-              current_position[E_AXIS]
-            );
-            planner.buffer_line(current_position[X_AXIS] + duplicate_extruder_x_offset,
-                             current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS], planner.max_feedrate_mm_s[X_AXIS], 1);
-            SYNC_PLAN_POSITION_KINEMATIC();
-            stepper.synchronize();
-            extruder_duplication_enabled = true;
-            active_extruder_parked = false;
-          }
-          break;
         case DXC_AUTO_PARK_MODE:
           if (current_position[E_AXIS] == destination[E_AXIS]) {
             // This is a travel move (with no extrusion)
@@ -9250,12 +9296,38 @@ void set_current_from_steppers_for_axis(const AxisEnum axis) {
               return false;
             }
           }
-          delayed_move_time = 0;
           // unpark extruder: 1) raise, 2) move into starting XY position, 3) lower
-          planner.buffer_line(raised_parked_position[X_AXIS], raised_parked_position[Y_AXIS], raised_parked_position[Z_AXIS], current_position[E_AXIS], planner.max_feedrate_mm_s[Z_AXIS], active_extruder);
-          planner.buffer_line(current_position[X_AXIS], current_position[Y_AXIS], raised_parked_position[Z_AXIS], current_position[E_AXIS], PLANNER_XY_FEEDRATE(), active_extruder);
-          planner.buffer_line(current_position[X_AXIS], current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS], planner.max_feedrate_mm_s[Z_AXIS], active_extruder);
+          for (uint8_t i = 0; i < 3; i++)
+            planner.buffer_line(
+              i == 0 ? raised_parked_position[X_AXIS] : current_position[X_AXIS],
+              i == 0 ? raised_parked_position[Y_AXIS] : current_position[Y_AXIS],
+              i == 2 ? current_position[Z_AXIS] : raised_parked_position[Z_AXIS],
+              current_position[E_AXIS],
+              i == 1 ? PLANNER_XY_FEEDRATE() : planner.max_feedrate_mm_s[Z_AXIS],
+              active_extruder
+            );
+          delayed_move_time = 0;
           active_extruder_parked = false;
+          break;
+        case DXC_DUPLICATION_MODE:
+          if (active_extruder == 0) {
+            // move duplicate extruder into correct duplication position.
+            planner.set_position_mm(
+              LOGICAL_X_POSITION(inactive_extruder_x_pos),
+              current_position[Y_AXIS],
+              current_position[Z_AXIS],
+              current_position[E_AXIS]
+            );
+            planner.buffer_line(
+              current_position[X_AXIS] + duplicate_extruder_x_offset,
+              current_position[Y_AXIS], current_position[Z_AXIS], current_position[E_AXIS],
+              planner.max_feedrate_mm_s[X_AXIS], 1
+            );
+            SYNC_PLAN_POSITION_KINEMATIC();
+            stepper.synchronize();
+            extruder_duplication_enabled = true;
+            active_extruder_parked = false;
+          }
           break;
       }
     }
@@ -9948,7 +10020,7 @@ void kill(const char* lcd_msg) {
   disable_all_steppers();
 
   #if HAS_POWER_SWITCH
-    pinMode(PS_ON_PIN, INPUT);
+    SET_INPUT(PS_ON_PIN);
   #endif
 
   suicide();
