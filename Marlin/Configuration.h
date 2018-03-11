@@ -696,7 +696,7 @@
  */
 #define X_PROBE_OFFSET_FROM_EXTRUDER -65  // X offset: -left  +right  [of the nozzle]
 #define Y_PROBE_OFFSET_FROM_EXTRUDER 10  // Y offset: -front +behind [the nozzle]
-#define Z_PROBE_OFFSET_FROM_EXTRUDER -2   // Z offset: -below +above  [the nozzle]
+#define Z_PROBE_OFFSET_FROM_EXTRUDER -1.8   // Z offset: -below +above  [the nozzle]
 
 // X and Y axis travel speed (mm/m) between probes
 #define XY_PROBE_SPEED 8000
@@ -710,7 +710,7 @@
 // The number of probes to perform at each point.
 //   Set to 2 for a fast/slow probe, using the second probe result.
 //   Set to 3 or more for slow probes, averaging the results.
-//#define MULTIPLE_PROBING 2
+// #define MULTIPLE_PROBING 2
 
 /**
  * Z probes require clearance when deploying, stowing, and moving between
@@ -726,8 +726,8 @@
  * Example: `M851 Z-5` with a CLEARANCE of 4  =>  9mm from bed to nozzle.
  *     But: `M851 Z+1` with a CLEARANCE of 2  =>  2mm from bed to nozzle.
  */
-#define Z_CLEARANCE_DEPLOY_PROBE   0 // Z Clearance for Deploy/Stow
-#define Z_CLEARANCE_BETWEEN_PROBES  0 // Z Clearance between probe points
+#define Z_CLEARANCE_DEPLOY_PROBE   1 // Z Clearance for Deploy/Stow
+#define Z_CLEARANCE_BETWEEN_PROBES 1 // Z Clearance between probe points
 
 // For M851 give a range for adjusting the Z probe offset
 #define Z_PROBE_OFFSET_RANGE_MIN -20
@@ -882,7 +882,7 @@
 //#define AUTO_BED_LEVELING_3POINT
 //#define AUTO_BED_LEVELING_LINEAR
 //#define AUTO_BED_LEVELING_BILINEAR
-//#define AUTO_BED_LEVELING_UBL
+#define AUTO_BED_LEVELING_UBL
 //#define MESH_BED_LEVELING
 
 /**
@@ -970,10 +970,10 @@
   //========================= Unified Bed Leveling ============================
   //===========================================================================
 
-  //#define MESH_EDIT_GFX_OVERLAY   // Display a graphics overlay while editing the mesh
+  #define MESH_EDIT_GFX_OVERLAY     // Display a graphics overlay while editing the mesh
 
-  #define MESH_INSET 1              // Mesh inset margin on print area
-  #define GRID_MAX_POINTS_X 10      // Don't use more than 15 points per axis, implementation limited.
+  #define MESH_INSET        5       // Mesh inset margin on print area
+  #define GRID_MAX_POINTS_X 5       // Don't use more than 15 points per axis, implementation limited.
   #define GRID_MAX_POINTS_Y GRID_MAX_POINTS_X
 
   #define UBL_PROBE_PT_1_X 39       // Probing points for 3-Point leveling of the mesh
@@ -983,7 +983,7 @@
   #define UBL_PROBE_PT_3_X 180
   #define UBL_PROBE_PT_3_Y 20
 
-  #define UBL_MESH_EDIT_MOVES_Z     // Sophisticated users prefer no movement of nozzle
+//  #define UBL_MESH_EDIT_MOVES_Z     // Sophisticated users prefer no movement of nozzle
   #define UBL_SAVE_ACTIVE_ON_M500   // Save the currently active mesh in the current slot on M500
 
 #elif ENABLED(MESH_BED_LEVELING)
