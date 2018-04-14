@@ -156,3 +156,11 @@
 #define SPINDLE_LASER_PWM_PIN     4  // MUST BE HARDWARE PWM
 #define SPINDLE_LASER_ENABLE_PIN 14  // Pin should have a pullup!
 #define SPINDLE_DIR_PIN          15
+
+//
+// Trinamic 2130 ChipSelect pin definitions
+//
+#define X_CS_PIN  30 // Arduino pin 31 = Mega PC6/A14
+#define Y_CS_PIN  31 // Arduino pin 30 = Mega PC7/A15
+#define Z_CS_PIN  14 // 
+#define E_CS_PIN  15 // 
