@@ -1417,26 +1417,13 @@
 #if ENABLED(CUSTOM_USER_MENUS)
   #define USER_SCRIPT_DONE "M117 User Script Done"
   #define USER_SCRIPT_AUDIBLE_FEEDBACK
-  //#define USER_SCRIPT_RETURN  // Return to status screen after a script
+  #define USER_SCRIPT_RETURN  // Return to status screen after a script
 
-  #define USER_DESC_1 "Load PLA"
-  #define USER_GCODE_1 "G28\nG1 X95 Y235 F3000\nT0\nM109 S210\nG92 E0\nG1 E50 F150\nM400\nG1 X95 Y200 F3000\nG1 X95 Y235 F3000\nM104 S0\nT0"
+  #define USER_DESC_1 "Preheat Bed"
+  #define USER_GCODE_1 "M140 S" STRINGIFY(PREHEAT_1_TEMP_BED) "\n"
 
-  #define USER_DESC_2 "Load PETG"
-  #define USER_GCODE_2 "G28\nG1 X95 Y235 F3000\nT0\nM109 S235\nG92 E0\nG1 E50 F150\nM400\nG1 X95 Y200 F3000\nG1 X95 Y235 F3000\nM104 S0\nT0"
-
-  #define USER_DESC_3 "Unload PLA"
-  #define USER_GCODE_3 "T0\nM109 S200\nG92 E0\nG1 E10 F200\nG1 E-120 F350\nM400\nM104 S0\nT0"
-
-  #define USER_DESC_4 "Unload PETG"
-  #define USER_GCODE_4 "T0\nM109 S235\nG92 E0\nG1 E10 F200\nG1 E-120 F350\nM400\nM104 S0\nT0"
-
-  #define USER_DESC_5 "Preheat Bed"
-  #define USER_GCODE_5 "M140 S" STRINGIFY(PREHEAT_1_TEMP_BED) "\n"
-
-  #define USER_DESC_6 "Lower Bed 30mm"
-  #define USER_GCODE_6 "G91\nG1 Z30 F3000\nG90"
-
+  #define USER_DESC_2 "Cancel Print"
+  #define USER_GCODE_2 "M118 //action:cancel\n"
 
   // #define USER_DESC_1 "Home & UBL Info"
   // #define USER_GCODE_1 "G28\nG29 W"
