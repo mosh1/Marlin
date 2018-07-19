@@ -1117,10 +1117,8 @@ void lcd_quick_feedback(const bool clear_buttons) {
         MENU_ITEM_EDIT_CALLBACK(bool, MSG_CASE_LIGHT, (bool*)&case_light_on, update_case_light);
     #endif
 
-    if (planner.movesplanned() || IS_SD_PRINTING)
+    if (planner.movesplanned() || IS_SD_PRINTING) {
       MENU_ITEM(submenu, MSG_TUNE, lcd_tune_menu);
-      MENU_ITEM(submenu, MSG_CONTROL, lcd_control_menu);
-
     }
     else {
       MENU_ITEM(submenu, MSG_PREPARE, lcd_prepare_menu);
@@ -1142,6 +1140,8 @@ void lcd_quick_feedback(const bool clear_buttons) {
       //
       MENU_ITEM(function, MSG_COOLDOWN, lcd_cooldown);
     }
+
+    MENU_ITEM(submenu, MSG_CONTROL, lcd_control_menu);
 
     #if ENABLED(SDSUPPORT)
       if (card.cardOK) {
@@ -3361,7 +3361,7 @@ void lcd_quick_feedback(const bool clear_buttons) {
     #endif
 
     // Add Move to 295 for BigBox
-    if (axis_homed[Z_AXIS]) {
+    if (all_axes_homed()) {
       MENU_ITEM(gcode, "Move Z to 295", PSTR("G1 Z295 F3000"));
     }
     else {
